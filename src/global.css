@@ -1,0 +1,223 @@
+/* Load Excalidraw's hand-drawn font from CDN (avoids inline data: URI blocked by CSP) */
+@font-face {
+  font-family: "Virgil";
+  src: url("https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/prod/fonts/Virgil/Virgil-Regular.woff2") format("woff2");
+  font-display: swap;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 1rem;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Light theme (default) */
+:root {
+  --text-color: #1a1a1a;
+  --text-muted: #666666;
+  --border-color: #e5e5e5;
+  --bg-color: #ffffff;
+}
+
+/* Dark theme */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text-color: #e5e5e5;
+    --text-muted: #a0a0a0;
+    --border-color: #444444;
+    --bg-color: #1a1a1a;
+  }
+}
+
+body {
+  background: transparent;
+  color: var(--text-color);
+}
+
+.main {
+  outline: none;
+  position: relative;
+}
+
+/* Fullscreen mode */
+.main.fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--bg-color, #ffffff);
+  z-index: 9999;
+}
+
+.main.fullscreen .excalidraw-container {
+  height: 100vh;
+}
+
+/* Contain SVG inside fullscreen viewport (not cover) */
+.main.fullscreen .svg-wrapper svg {
+  max-height: 100vh;
+}
+
+/* Toolbar - appears on hover */
+.toolbar {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 100;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.main:hover .toolbar {
+  opacity: 1;
+}
+
+/* Fullscreen button */
+.fullscreen-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: #666666;
+  background: #ffffff;
+  border: 1px solid #e5e5e5;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  pointer-events: auto;
+}
+
+.fullscreen-btn:hover {
+  color: #1a1a1a;
+  border-color: #666666;
+}
+
+/* Hide fullscreen button in fullscreen mode (host provides exit UI) */
+.main.fullscreen .fullscreen-btn {
+  display: none !important;
+}
+
+.excalidraw-container {
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+/* SVGLayer is for export only, not rendering — hide to save space */
+.excalidraw-container .excalidraw .SVGLayer {
+  display: none !important;
+}
+
+/* Hide Excalidraw UI chrome in view mode */
+.excalidraw-container .excalidraw .App-menu,
+.excalidraw-container .excalidraw .App-toolbar,
+.excalidraw-container .excalidraw .layer-ui__wrapper__footer,
+.excalidraw-container .excalidraw .App-menu_top,
+.excalidraw-container .excalidraw .undo-redo-buttons,
+.excalidraw-container .excalidraw .HelpButton,
+.excalidraw-container .excalidraw .UserList,
+.excalidraw-container .excalidraw .main-menu-trigger,
+.excalidraw-container .excalidraw .welcome-screen-center,
+.excalidraw-container .excalidraw .welcome-screen-menu-hintContainer {
+  display: none !important;
+}
+
+
+.loading-state {
+  padding: 2rem 1rem;
+  text-align: center;
+}
+
+.loading-text {
+  font-size: 1rem;
+  color: var(--text-muted);
+}
+
+/* SVG wrapper */
+.svg-wrapper {
+  width: 100%;
+}
+
+/* Fade-in animation for new SVG elements (opacity only, no transform) */
+.excalidraw-container svg :where(g, rect, circle, ellipse, text, image) {
+  animation: svgFadeIn 0.5s ease-out;
+}
+
+@keyframes svgFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Stroke draw-on animation for line elements */
+.excalidraw-container svg :where(path, line, polyline, polygon) {
+  animation: strokeDraw 0.6s ease-out forwards;
+}
+
+@keyframes strokeDraw {
+  from {
+    stroke-dasharray: 1000;
+    stroke-dashoffset: 1000;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Smooth transitions for property changes on existing elements */
+.excalidraw-container svg :where(rect, circle, ellipse, path, line, polyline, polygon, text, g) {
+  transition: fill 0.4s ease-out, stroke 0.4s ease-out, opacity 0.4s ease-out;
+}
+
+/* Chart container */
+.chart-container {
+  height: 400px;
+  width: 100%;
+}
+
+.chart-title {
+  margin: 12px 16px 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.tooltip {
+  background: var(--bg-color, #fff);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--text-color);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+/* HTML iframe container */
+.html-container {
+  width: 100%;
+  height: 500px;
+  border: none;
+}
+
+.main.fullscreen .html-container {
+  height: 100vh;
+}
+
+.loading {
+  padding: 1rem;
+  color: var(--text-muted);
+}
+
+.error {
+  padding: 1rem;
+  color: #dc2626;
+}
