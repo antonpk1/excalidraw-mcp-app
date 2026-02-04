@@ -1,0 +1,44 @@
+{
+  "manifest_version": "0.3",
+  "name": "excalidraw-mcp-app",
+  "display_name": "Excalidraw",
+  "version": "0.1.0",
+  "description": "Hand-drawn diagrams and visual infographics with streaming animations, viewport camera control, and interactive fullscreen editing.",
+  "long_description": "An MCP App server that renders Excalidraw diagrams with hand-drawn style. Features streaming SVG rendering with draw-on animations, smooth viewport camera panning, label binding (text auto-centered inside shapes), interactive Excalidraw editor in fullscreen mode, and screenshot context sent back to Claude for iterative feedback.",
+  "author": {
+    "name": "Anton Pidkuiko",
+    "url": "https://github.com/antonpk1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/antonpk1/excalidraw-mcp-app.git"
+  },
+  "homepage": "https://github.com/antonpk1/excalidraw-mcp-app",
+  "icon": "logo.png",
+  "server": {
+    "type": "node",
+    "entry_point": "dist/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/dist/index.js", "--stdio"]
+    }
+  },
+  "tools": [
+    {
+      "name": "read_me",
+      "description": "Returns the Excalidraw element format reference with color palettes, examples, and tips. Call this before using create_view."
+    },
+    {
+      "name": "create_view",
+      "description": "Renders a hand-drawn diagram using Excalidraw elements with streaming draw-on animations."
+    }
+  ],
+  "keywords": ["excalidraw", "diagrams", "drawing", "visualization", "mcp-app"],
+  "compatibility": {
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  },
+  "license": "MIT"
+}

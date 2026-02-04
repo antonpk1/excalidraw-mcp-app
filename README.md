@@ -12,18 +12,22 @@ MCP server that streams hand-drawn Excalidraw diagrams with smooth viewport came
 
 ## Install
 
+### Option 1: Download Extension (Recommended)
+
+1. Download the latest `excalidraw-mcp-app.mcpb` from [Releases](https://github.com/antonpk1/excalidraw-mcp-app/releases)
+2. Double-click the `.mcpb` file to install in Claude Desktop
+3. Done — start using Excalidraw in your conversations
+
+### Option 2: Build from Source
+
 ```bash
-git clone <repo-url>
-cd excalidraw-mcp
+git clone https://github.com/antonpk1/excalidraw-mcp-app.git
+cd excalidraw-mcp-app
 npm install
 npm run build
 ```
 
-## Configuration
-
-### Claude Desktop
-
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+Then add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
 {
@@ -35,6 +39,8 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
   }
 }
 ```
+
+Restart Claude Desktop to pick up the new server.
 
 ## Usage
 

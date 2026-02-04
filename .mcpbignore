@@ -1,0 +1,12 @@
+node_modules/
+src/
+*.ts
+!*.d.ts
+/mcp-app.html
+tsconfig.json
+tsconfig.server.json
+vite.config.ts
+CLAUDE.md
+.git/
+.gitignore
+*.mcpb
