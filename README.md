@@ -2,6 +2,8 @@
 
 MCP server that streams hand-drawn Excalidraw diagrams with smooth viewport camera control and interactive fullscreen editing.
 
+![Demo](demo.gif)
+
 ## Features
 
 - Streaming SVG rendering with draw-on animations
