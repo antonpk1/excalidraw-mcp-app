@@ -21,32 +21,6 @@ npm run build
 
 ## Configuration
 
-### Claude Code (`.mcp.json`)
-
-```json
-{
-  "mcpServers": {
-    "excalidraw": {
-      "command": "npx",
-      "args": ["-y", "@mcp-demos/excalidraw-server", "--stdio"]
-    }
-  }
-}
-```
-
-Or if running from a local build:
-
-```json
-{
-  "mcpServers": {
-    "excalidraw": {
-      "command": "node",
-      "args": ["/path/to/excalidraw-mcp/dist/index.js", "--stdio"]
-    }
-  }
-}
-```
-
 ### Claude Desktop
 
 Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
@@ -56,7 +30,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
   "mcpServers": {
     "excalidraw": {
       "command": "node",
-      "args": ["/path/to/excalidraw-mcp/dist/index.js", "--stdio"]
+      "args": ["/path/to/excalidraw-mcp-app/dist/index.js", "--stdio"]
     }
   }
 }
