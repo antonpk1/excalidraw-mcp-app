@@ -1,6 +1,6 @@
 {
   "name": "@mcp-demos/excalidraw-server",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "description": "Streamable Excalidraw diagram MCP App server",
   "license": "MIT",
