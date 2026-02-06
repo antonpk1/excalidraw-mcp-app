@@ -35893,11 +35893,7 @@ so the user sees the complete picture when generation finishes.
 - Elements stream in one by one during generation
 - Do NOT use emoji in text — they don't render in Excalidraw's font
 `;
-function createServer() {
-  const server = new McpServer({
-    name: "Excalidraw",
-    version: "1.0.0"
-  });
+function registerTools(server, distDir) {
   const resourceUri = "ui://excalidraw/mcp-app.html";
   server.registerTool("read_me", {
     description: "Returns the Excalidraw element format reference with color palettes, examples, and tips. Call this BEFORE using create_view for the first time.",
@@ -35935,7 +35931,7 @@ Call read_me first to learn the element format.`,
     }
   };
   ak(server, resourceUri, resourceUri, { mimeType: EI }, async () => {
-    const html = await fs.readFile(path.join(DIST_DIR, "mcp-app.html"), "utf-8");
+    const html = await fs.readFile(path.join(distDir, "mcp-app.html"), "utf-8");
     return {
       contents: [{
         uri: resourceUri,
@@ -35950,8 +35946,16 @@ Call read_me first to learn the element format.`,
       }]
     };
   });
+}
+function createServer() {
+  const server = new McpServer({
+    name: "Excalidraw",
+    version: "1.0.0"
+  });
+  registerTools(server, DIST_DIR);
   return server;
 }
 export {
+  registerTools,
   createServer
 };

@@ -17,7 +17,7 @@ MCP server that streams hand-drawn Excalidraw diagrams with smooth viewport came
 In [claude.ai](https://claude.ai):
 
 1. Go to **Settings** → **Connectors** → **Add custom connector**
-2. Server URL: `https://excalidraw-mcp-app.vercel.app/api/mcp`
+2. Server URL: `https://excalidraw-mcp-app.vercel.app/mcp`
 3. Done — start using Excalidraw in your conversations
 
 ### Alternative: Local Server

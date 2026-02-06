@@ -30471,7 +30471,7 @@ class StreamableHTTPServerTransport {
         authInfo: context?.authInfo,
         parsedBody: context?.parsedBody
       });
-    }, { overrideGlobalObjects: false });
+    });
   }
   get sessionId() {
     return this._webStandardTransport.sessionId;
@@ -30510,7 +30510,7 @@ class StreamableHTTPServerTransport {
         authInfo,
         parsedBody
       });
-    }, { overrideGlobalObjects: false });
+    });
     await handler(req, res);
   }
   closeSSEStream(requestId) {
