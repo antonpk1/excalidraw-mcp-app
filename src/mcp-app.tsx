@@ -5,7 +5,7 @@ import morphdom from "morphdom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { initPencilAudio, playStroke } from "./pencil-audio";
-import { captureInitialElements, onEditorChange, setStorageKey, loadPersistedElements, getLatestEditedElements } from "./edit-context";
+import { captureInitialElements, onEditorChange, setStorageKey, loadPersistedElements, getLatestEditedElements, setCheckpointId } from "./edit-context";
 import "./global.css";
 
 // ============================================================
@@ -46,19 +46,27 @@ interface ViewportRect {
 function extractViewportAndElements(elements: any[]): {
   viewport: ViewportRect | null;
   drawElements: any[];
+  restoreId: string | null;
+  deleteIds: Set<string>;
 } {
   let viewport: ViewportRect | null = null;
+  let restoreId: string | null = null;
+  const deleteIds = new Set<string>();
   const drawElements: any[] = [];
 
   for (const el of elements) {
     if (el.type === "cameraUpdate" || el.type === "viewportUpdate") {
       viewport = { x: el.x, y: el.y, width: el.width, height: el.height };
+    } else if (el.type === "restoreCheckpoint") {
+      restoreId = el.id;
+    } else if (el.type === "deleteElement") {
+      deleteIds.add(el.id);
     } else {
       drawElements.push(el);
     }
   }
 
-  return { viewport, drawElements };
+  return { viewport, drawElements, restoreId, deleteIds };
 }
 
 const ExpandIcon = () => (
@@ -120,6 +128,7 @@ function sceneToSvgViewBox(
 function DiagramView({ toolInput, isFinal, displayMode, onElements, editedElements, onViewport }: { toolInput: any; isFinal: boolean; displayMode: string; onElements?: (els: any[]) => void; editedElements?: any[]; onViewport?: (vp: ViewportRect) => void }) {
   const svgRef = useRef<HTMLDivElement | null>(null);
   const latestRef = useRef<any[]>([]);
+  const restoredRef = useRef<{ id: string; elements: any[] } | null>(null);
   const [, setCount] = useState(0);
 
   // Init pencil audio on first mount
@@ -189,23 +198,24 @@ function DiagramView({ toolInput, isFinal, displayMode, onElements, editedElemen
     return () => { if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current); };
   }, []);
 
-  const renderSvgPreview = useCallback(async (els: any[], viewport: ViewportRect | null) => {
-    if (els.length === 0 || !svgRef.current) return;
+  const renderSvgPreview = useCallback(async (els: any[], viewport: ViewportRect | null, baseElements?: any[]) => {
+    if ((els.length === 0 && !baseElements?.length) || !svgRef.current) return;
     try {
-      // Update scene bounds (used by applyViewBox for coordinate conversion)
-      sceneBoundsRef.current = computeSceneBounds(els);
-
       // Wait for Virgil font to load before computing text metrics
       await ensureFontsLoaded();
 
-      // Convert skeleton elements to proper Excalidraw elements
-      // (handles label→boundText bindings, computes dimensions)
+      // Convert new elements (raw → Excalidraw format)
       const withLabelDefaults = els.map((el: any) =>
         el.label ? { ...el, label: { textAlign: "center", verticalAlign: "middle", ...el.label } } : el
       );
-      const excalidrawEls = convertToExcalidrawElements(withLabelDefaults, { regenerateIds: false })
-        // Force Virgil (fontFamily: 1) on all text — including label-generated ones
+      const convertedNew = convertToExcalidrawElements(withLabelDefaults, { regenerateIds: false })
         .map((el: any) => el.type === "text" ? { ...el, fontFamily: (FONT_FAMILY as any).Excalifont ?? 1 } : el);
+
+      // Merge with checkpoint base (already converted — skip re-conversion to avoid corruption)
+      const excalidrawEls = baseElements ? [...baseElements, ...convertedNew] : convertedNew;
+
+      // Update scene bounds from all elements
+      sceneBoundsRef.current = computeSceneBounds(excalidrawEls);
 
       const svg = await exportToSvg({
         elements: excalidrawEls as any,
@@ -279,25 +289,62 @@ function DiagramView({ toolInput, isFinal, displayMode, onElements, editedElemen
     if (isFinal) {
       // Final input — parse complete JSON, render ALL elements
       const parsed = parsePartialElements(str);
-      const { viewport, drawElements } = extractViewportAndElements(parsed);
+      const { viewport, drawElements, restoreId, deleteIds } = extractViewportAndElements(parsed);
+
+      // Load checkpoint base if restoring
+      let base: any[] | undefined;
+      if (restoreId) {
+        const saved = localStorage.getItem(`checkpoint:${restoreId}`);
+        if (saved) try { base = JSON.parse(saved); } catch {}
+        if (base && deleteIds.size > 0) {
+          base = base.filter((el: any) => !deleteIds.has(el.id));
+        }
+      }
+
       latestRef.current = drawElements;
-      // Pass converted elements for fullscreen editor
+      // Convert new elements for fullscreen editor
       const withDefaults = drawElements.map((el: any) =>
         el.label ? { ...el, label: { textAlign: "center", verticalAlign: "middle", ...el.label } } : el
       );
-      const converted = convertToExcalidrawElements(withDefaults, { regenerateIds: false })
+      const convertedNew = convertToExcalidrawElements(withDefaults, { regenerateIds: false })
         .map((el: any) => el.type === "text" ? { ...el, fontFamily: (FONT_FAMILY as any).Excalifont ?? 1 } : el);
-      captureInitialElements(converted);
+
+      // Merge base (already converted) + new converted
+      const allConverted = base ? [...base, ...convertedNew] : convertedNew;
+      captureInitialElements(allConverted);
       // Only set elements if user hasn't edited yet (editedElements means user edits exist)
-      if (!editedElements) onElements?.(converted);
-      renderSvgPreview(drawElements, viewport);
+      if (!editedElements) onElements?.(allConverted);
+      renderSvgPreview(drawElements, viewport, base);
       return;
     }
 
     // Partial input — drop last (potentially incomplete) element
     const parsed = parsePartialElements(str);
+
+    // Extract restoreCheckpoint and deleteElement before dropping last (they're small, won't be incomplete)
+    let streamRestoreId: string | null = null;
+    const streamDeleteIds = new Set<string>();
+    for (const el of parsed) {
+      if (el.type === "restoreCheckpoint") streamRestoreId = el.id;
+      else if (el.type === "deleteElement") streamDeleteIds.add(el.id);
+    }
+
     const safe = excludeIncompleteLastItem(parsed);
     const { viewport, drawElements } = extractViewportAndElements(safe);
+
+    // Load checkpoint base (once per restoreId)
+    let base: any[] | undefined;
+    if (streamRestoreId) {
+      if (!restoredRef.current || restoredRef.current.id !== streamRestoreId) {
+        const saved = localStorage.getItem(`checkpoint:${streamRestoreId}`);
+        if (saved) try { restoredRef.current = { id: streamRestoreId, elements: JSON.parse(saved) }; } catch {}
+      }
+      base = restoredRef.current?.elements;
+      if (base && streamDeleteIds.size > 0) {
+        base = base.filter((el: any) => !streamDeleteIds.has(el.id));
+      }
+    }
+
     if (drawElements.length > 0 && drawElements.length !== latestRef.current.length) {
       // Play pencil sound for each new element
       const prevCount = latestRef.current.length;
@@ -307,7 +354,10 @@ function DiagramView({ toolInput, isFinal, displayMode, onElements, editedElemen
       latestRef.current = drawElements;
       setCount(drawElements.length);
       const jittered = drawElements.map((el: any) => ({ ...el, seed: Math.floor(Math.random() * 1e9) }));
-      renderSvgPreview(jittered, viewport);
+      renderSvgPreview(jittered, viewport, base);
+    } else if (base && base.length > 0 && latestRef.current.length === 0) {
+      // First render: show restored base before new elements stream in
+      renderSvgPreview([], viewport, base);
     }
   }, [toolInput, isFinal, renderSvgPreview]);
 
@@ -369,6 +419,8 @@ function ExcalidrawApp() {
   const [editorSettled, setEditorSettled] = useState(false);
   const appRef = useRef<App | null>(null);
   const svgViewportRef = useRef<ViewportRect | null>(null);
+  const elementsRef = useRef<any[]>([]);
+  const checkpointIdRef = useRef<string | null>(null);
 
   const toggleFullscreen = useCallback(async () => {
     if (!appRef.current) return;
@@ -456,6 +508,9 @@ function ExcalidrawApp() {
     return () => clearTimeout(timer);
   }, [mountEditor, excalidrawApi]);
 
+  // Keep elementsRef in sync for ontoolresult handler (which captures closure once)
+  useEffect(() => { elementsRef.current = elements; }, [elements]);
+
   const { app, error } = useApp({
     appInfo: { name: "Excalidraw", version: "1.0.0" },
     capabilities: {},
@@ -498,6 +553,21 @@ function ExcalidrawApp() {
         }
         setInputIsFinal(true);
         setToolInput(args);
+      };
+
+      app.ontoolresult = (result: any) => {
+        const cpId = (result.structuredContent as { checkpointId?: string })?.checkpointId;
+        if (cpId) {
+          checkpointIdRef.current = cpId;
+          setCheckpointId(cpId);
+          // Save current elements to checkpoint
+          const els = elementsRef.current;
+          if (els.length > 0) {
+            try {
+              localStorage.setItem(`checkpoint:${cpId}`, JSON.stringify(els));
+            } catch {}
+          }
+        }
       };
 
       app.onteardown = async () => ({});

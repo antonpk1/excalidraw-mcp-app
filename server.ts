@@ -290,6 +290,14 @@ This demonstrates camera panning across a large canvas to tell a story. Two brow
 ]
 \`\`\`
 
+## Checkpoints (restoring previous state)
+
+Every create_view call returns a \`checkpointId\` in its response. To continue from a previous diagram state, start your elements array with a restoreCheckpoint element:
+
+\`[{"type":"restoreCheckpoint","id":"<checkpointId>"}, ...additional new elements...]\`
+
+The saved state (including any user edits made in fullscreen) is loaded from the client, and your new elements are appended on top. This saves tokens — you don't need to re-send the entire diagram.
+
 ## Tips
 - Do NOT call read_me again — you already have everything you need
 - Use the color palette consistently
@@ -346,7 +354,18 @@ Call read_me first to learn the element format.`,
           isError: true,
         };
       }
-      return { content: [{ type: "text", text: "Diagram displayed. If the user edits the diagram in fullscreen, updated elements JSON is sent as model context." }] };
+      const checkpointId = Math.random().toString(36).slice(2, 8);
+      return {
+        content: [{ type: "text", text: `Diagram displayed! Checkpoint id: "${checkpointId}".
+If user asks to create a new diagram - simply create a new one from scratch.
+However, if the user wants to edit something on this diagram "${checkpointId}", take these steps:
+1) read widget context (using read_widget_context tool) to check if user made any manual edits first
+2) decide whether you want to make new diagram from scratch OR - use this one as starting checkpoint:
+  simply start from the first element [{"type":"restoreCheckpoint","id":"${checkpointId}"}, ...your new elements...]
+  this will use same diagram state as the user currently sees, including any manual edits they made in fullscreen, allowing you to add elements on top.
+  To remove elements from the restored state, use: {"type":"deleteElement","id":"<elementId>"}` }],
+        structuredContent: { checkpointId },
+      };
     },
   );
 

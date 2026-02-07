@@ -5,12 +5,23 @@ let timer: ReturnType<typeof setTimeout> | null = null;
 let initialSnapshot: string | null = null;
 let initialElementsById: Map<string, any> = new Map();
 let storageKey: string | null = null;
+let checkpointKey: string | null = null;
+let checkpointId: string | null = null;
 
 /**
  * Set the localStorage key for this widget instance (use viewUUID or tool-call-derived ID).
  */
 export function setStorageKey(key: string) {
   storageKey = `excalidraw:${key}`;
+}
+
+/**
+ * Set the checkpoint key for saving state snapshots.
+ * Called when ontoolresult delivers the checkpointId from the server.
+ */
+export function setCheckpointId(id: string) {
+  checkpointId = id;
+  checkpointKey = `checkpoint:${id}`;
 }
 
 /**
@@ -50,7 +61,8 @@ function computeDiff(current: any[]): string {
   if (removed.length) parts.push(`Removed: ${removed.join(", ")}`);
   if (moved.length) parts.push(`Moved/resized: ${moved.join("; ")}`);
   if (!parts.length) return "";
-  return `User edited diagram. ${parts.join(". ")}`;
+  const cpRef = checkpointId ? ` (checkpoint: ${checkpointId})` : "";
+  return `User edited diagram${cpRef}. ${parts.join(". ")}`;
 }
 
 /**
@@ -96,7 +108,11 @@ export function onEditorChange(app: App, elements: readonly any[]) {
       try {
         localStorage.setItem(storageKey, JSON.stringify(live));
       } catch {}
-
+    }
+    if (checkpointKey) {
+      try {
+        localStorage.setItem(checkpointKey, JSON.stringify(live));
+      } catch {}
     }
     const diff = computeDiff(live);
     if (diff) {
