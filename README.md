@@ -10,7 +10,7 @@ Works with any client that supports [MCP Apps](https://modelcontextprotocol.io/d
 
 ### Remote (recommended)
 
-> **Server URL:** `https://excalidraw-mcp-app.vercel.app/mcp`
+> :point_right: **Server URL:** `https://excalidraw-mcp-app.vercel.app/mcp`
 
 Add as a remote MCP server in your client. For example, in [claude.ai](https://claude.ai): **Settings** → **Connectors** → **Add custom connector** → paste the URL above.
 
