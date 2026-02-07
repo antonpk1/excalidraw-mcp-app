@@ -7,6 +7,7 @@ let initialElementsById: Map<string, any> = new Map();
 let storageKey: string | null = null;
 let checkpointKey: string | null = null;
 let checkpointId: string | null = null;
+let checkpointViewport: any = null;
 
 /**
  * Set the localStorage key for this widget instance (use viewUUID or tool-call-derived ID).
@@ -22,6 +23,10 @@ export function setStorageKey(key: string) {
 export function setCheckpointId(id: string) {
   checkpointId = id;
   checkpointKey = `checkpoint:${id}`;
+}
+
+export function setCheckpointViewport(vp: any) {
+  checkpointViewport = vp;
 }
 
 /**
@@ -111,7 +116,7 @@ export function onEditorChange(app: App, elements: readonly any[]) {
     }
     if (checkpointKey) {
       try {
-        localStorage.setItem(checkpointKey, JSON.stringify(live));
+        localStorage.setItem(checkpointKey, JSON.stringify({ elements: live, viewport: checkpointViewport }));
       } catch {}
     }
     const diff = computeDiff(live);

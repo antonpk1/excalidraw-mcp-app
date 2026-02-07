@@ -5,7 +5,7 @@ import morphdom from "morphdom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { initPencilAudio, playStroke } from "./pencil-audio";
-import { captureInitialElements, onEditorChange, setStorageKey, loadPersistedElements, getLatestEditedElements, setCheckpointId } from "./edit-context";
+import { captureInitialElements, onEditorChange, setStorageKey, loadPersistedElements, getLatestEditedElements, setCheckpointId, setCheckpointViewport } from "./edit-context";
 import "./global.css";
 
 // ============================================================
@@ -128,7 +128,7 @@ function sceneToSvgViewBox(
 function DiagramView({ toolInput, isFinal, displayMode, onElements, editedElements, onViewport }: { toolInput: any; isFinal: boolean; displayMode: string; onElements?: (els: any[]) => void; editedElements?: any[]; onViewport?: (vp: ViewportRect) => void }) {
   const svgRef = useRef<HTMLDivElement | null>(null);
   const latestRef = useRef<any[]>([]);
-  const restoredRef = useRef<{ id: string; elements: any[] } | null>(null);
+  const restoredRef = useRef<{ id: string; elements: any[]; viewport: ViewportRect | null } | null>(null);
   const [, setCount] = useState(0);
 
   // Init pencil audio on first mount
@@ -293,13 +293,22 @@ function DiagramView({ toolInput, isFinal, displayMode, onElements, editedElemen
 
       // Load checkpoint base if restoring
       let base: any[] | undefined;
+      let savedViewport: ViewportRect | null = null;
       if (restoreId) {
         const saved = localStorage.getItem(`checkpoint:${restoreId}`);
-        if (saved) try { base = JSON.parse(saved); } catch {}
+        if (saved) try {
+          const parsed = JSON.parse(saved);
+          // Handle both old format (array) and new format ({ elements, viewport })
+          base = Array.isArray(parsed) ? parsed : parsed.elements;
+          savedViewport = Array.isArray(parsed) ? null : parsed.viewport ?? null;
+        } catch {}
         if (base && deleteIds.size > 0) {
           base = base.filter((el: any) => !deleteIds.has(el.id));
         }
       }
+
+      // Use saved viewport as fallback if no cameraUpdate in new elements
+      const effectiveViewport = viewport ?? savedViewport;
 
       latestRef.current = drawElements;
       // Convert new elements for fullscreen editor
@@ -314,7 +323,7 @@ function DiagramView({ toolInput, isFinal, displayMode, onElements, editedElemen
       captureInitialElements(allConverted);
       // Only set elements if user hasn't edited yet (editedElements means user edits exist)
       if (!editedElements) onElements?.(allConverted);
-      renderSvgPreview(drawElements, viewport, base);
+      renderSvgPreview(drawElements, effectiveViewport, base);
       return;
     }
 
@@ -334,16 +343,26 @@ function DiagramView({ toolInput, isFinal, displayMode, onElements, editedElemen
 
     // Load checkpoint base (once per restoreId)
     let base: any[] | undefined;
+    let savedViewport: ViewportRect | null = null;
     if (streamRestoreId) {
       if (!restoredRef.current || restoredRef.current.id !== streamRestoreId) {
         const saved = localStorage.getItem(`checkpoint:${streamRestoreId}`);
-        if (saved) try { restoredRef.current = { id: streamRestoreId, elements: JSON.parse(saved) }; } catch {}
+        if (saved) try {
+          const parsed = JSON.parse(saved);
+          const els = Array.isArray(parsed) ? parsed : parsed.elements;
+          const vp = Array.isArray(parsed) ? null : parsed.viewport ?? null;
+          restoredRef.current = { id: streamRestoreId, elements: els, viewport: vp };
+        } catch {}
       }
       base = restoredRef.current?.elements;
+      savedViewport = restoredRef.current?.viewport ?? null;
       if (base && streamDeleteIds.size > 0) {
         base = base.filter((el: any) => !streamDeleteIds.has(el.id));
       }
     }
+
+    // Use saved viewport as fallback if no cameraUpdate in new elements
+    const effectiveViewport = viewport ?? savedViewport;
 
     if (drawElements.length > 0 && drawElements.length !== latestRef.current.length) {
       // Play pencil sound for each new element
@@ -354,10 +373,10 @@ function DiagramView({ toolInput, isFinal, displayMode, onElements, editedElemen
       latestRef.current = drawElements;
       setCount(drawElements.length);
       const jittered = drawElements.map((el: any) => ({ ...el, seed: Math.floor(Math.random() * 1e9) }));
-      renderSvgPreview(jittered, viewport, base);
+      renderSvgPreview(jittered, effectiveViewport, base);
     } else if (base && base.length > 0 && latestRef.current.length === 0) {
       // First render: show restored base before new elements stream in
-      renderSvgPreview([], viewport, base);
+      renderSvgPreview([], effectiveViewport, base);
     }
   }, [toolInput, isFinal, renderSvgPreview]);
 
@@ -534,6 +553,7 @@ function ExcalidrawApp() {
         // Check for persisted edits from a previous fullscreen session
         const persisted = loadPersistedElements();
         if (persisted && persisted.length > 0) {
+          elementsRef.current = persisted;
           setElements(persisted);
           setUserEdits(persisted);
         }
@@ -546,11 +566,15 @@ function ExcalidrawApp() {
         if (cpId) {
           checkpointIdRef.current = cpId;
           setCheckpointId(cpId);
-          // Save current elements to checkpoint
+          setCheckpointViewport(svgViewportRef.current);
+          // Save current elements + viewport to checkpoint
           const els = elementsRef.current;
           if (els.length > 0) {
             try {
-              localStorage.setItem(`checkpoint:${cpId}`, JSON.stringify(els));
+              localStorage.setItem(`checkpoint:${cpId}`, JSON.stringify({
+                elements: els,
+                viewport: svgViewportRef.current,
+              }));
             } catch {}
           }
         }
@@ -600,7 +624,7 @@ function ExcalidrawApp() {
           onClick={displayMode === "inline" ? toggleFullscreen : undefined}
           style={{ cursor: displayMode === "inline" ? "pointer" : undefined }}
         >
-          <DiagramView toolInput={toolInput} isFinal={inputIsFinal} displayMode={displayMode} onElements={setElements} editedElements={userEdits ?? undefined} onViewport={(vp) => { svgViewportRef.current = vp; }} />
+          <DiagramView toolInput={toolInput} isFinal={inputIsFinal} displayMode={displayMode} onElements={(els) => { elementsRef.current = els; setElements(els); }} editedElements={userEdits ?? undefined} onViewport={(vp) => { svgViewportRef.current = vp; }} />
         </div>
       )}
     </main>
