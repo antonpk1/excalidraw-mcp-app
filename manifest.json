@@ -2,9 +2,9 @@
   "manifest_version": "0.3",
   "name": "excalidraw-mcp-app",
   "display_name": "Excalidraw",
-  "version": "0.2.0",
-  "description": "Hand-drawn diagrams and visual infographics with streaming animations, viewport camera control, and interactive fullscreen editing.",
-  "long_description": "An MCP App server that renders Excalidraw diagrams with hand-drawn style. Features streaming SVG rendering with draw-on animations, smooth viewport camera panning, label binding (text auto-centered inside shapes), interactive Excalidraw editor in fullscreen mode, and screenshot context sent back to Claude for iterative feedback.",
+  "version": "0.3.0",
+  "description": "Hand-drawn diagrams with streaming animations, fullscreen editing, checkpoint/restore, and one-click export to excalidraw.com.",
+  "long_description": "An MCP App server that renders Excalidraw diagrams with hand-drawn style. Features streaming SVG rendering with draw-on animations, smooth viewport camera panning, label binding, interactive fullscreen editing with export to excalidraw.com, checkpoint/restore for iterative edits, and screenshot context sent back to Claude for feedback.",
   "author": {
     "name": "Anton Pidkuiko",
     "url": "https://github.com/antonpk1"
