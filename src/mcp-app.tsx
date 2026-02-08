@@ -565,6 +565,7 @@ function ExcalidrawApp() {
   const svgViewportRef = useRef<ViewportRect | null>(null);
   const elementsRef = useRef<any[]>([]);
   const checkpointIdRef = useRef<string | null>(null);
+  const lastInputRef = useRef<string | null>(null); // dedup replays on scroll
 
   const toggleFullscreen = useCallback(async () => {
     if (!appRef.current) return;
@@ -707,6 +708,10 @@ function ExcalidrawApp() {
 
       app.ontoolinput = async (input) => {
         const args = (input as any)?.arguments || input;
+        // Deduplicate replays: VS Code re-fires ontoolinput when scrolling widgets into view
+        const inputKey = typeof args?.elements === "string" ? args.elements : JSON.stringify(args?.elements ?? "");
+        if (lastInputRef.current === inputKey && elementsRef.current.length > 0) return;
+        lastInputRef.current = inputKey;
         // Use the JSON-RPC tool call ID as localStorage key (stable across reloads)
         const toolCallId = String(app.getHostContext()?.toolInfo?.id ?? "");
         if (toolCallId) {
@@ -725,6 +730,8 @@ function ExcalidrawApp() {
 
       app.ontoolresult = (result: any) => {
         const cpId = (result.structuredContent as { checkpointId?: string })?.checkpointId;
+        // Skip if we already processed this checkpoint (replay on scroll)
+        if (cpId && cpId === checkpointIdRef.current) return;
         if (cpId) {
           checkpointIdRef.current = cpId;
           setCheckpointId(cpId);
