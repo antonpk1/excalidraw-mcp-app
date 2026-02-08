@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 import { createRequire } from "node:module";
 var __create = Object.create;
 var __getProtoOf = Object.getPrototypeOf;
@@ -15077,17 +15076,6 @@ var require_db = __commonJS((exports, module) => {
   };
 });
 
-// node_modules/mime-db/index.js
-var require_mime_db = __commonJS((exports, module) => {
-  /*!
-   * mime-db
-   * Copyright(c) 2014 Jonathan Ong
-   * Copyright(c) 2015-2022 Douglas Christopher Wilson
-   * MIT Licensed
-   */
-  module.exports = require_db();
-});
-
 // node_modules/mime-types/mimeScore.js
 var require_mimeScore = __commonJS((exports, module) => {
   var FACET_SCORES = {
@@ -15132,7 +15120,7 @@ var require_mime_types = __commonJS((exports) => {
    * Copyright(c) 2015 Douglas Christopher Wilson
    * MIT Licensed
    */
-  var db = require_mime_db();
+  var db = require_db();
   var extname = __require("path").extname;
   var mimeScore = require_mimeScore();
   var EXTRACT_TYPE_REGEXP = /^\s*([^;\s]*)(?:;|\s|$)/;
@@ -16419,7 +16407,7 @@ var require_round = __commonJS((exports, module) => {
 
 // node_modules/math-intrinsics/isNaN.js
 var require_isNaN = __commonJS((exports, module) => {
-  module.exports = Number.isNaN || function isNaN(a) {
+  module.exports = Number.isNaN || function isNaN2(a) {
     return a !== a;
   };
 });
@@ -16553,7 +16541,7 @@ var require_implementation = __commonJS((exports, module) => {
   var toStr = Object.prototype.toString;
   var max = Math.max;
   var funcType = "[object Function]";
-  var concatty = function concatty(a, b) {
+  var concatty = function concatty2(a, b) {
     var arr = [];
     for (var i = 0;i < a.length; i += 1) {
       arr[i] = a[i];
@@ -16563,7 +16551,7 @@ var require_implementation = __commonJS((exports, module) => {
     }
     return arr;
   };
-  var slicy = function slicy(arrLike, offset) {
+  var slicy = function slicy2(arrLike, offset) {
     var arr = [];
     for (var i = offset || 0, j = 0;i < arrLike.length; i += 1, j += 1) {
       arr[j] = arrLike[i];
@@ -16604,7 +16592,7 @@ var require_implementation = __commonJS((exports, module) => {
     }
     bound = Function("binder", "return function (" + joiny(boundArgs, ",") + "){ return binder.apply(this,arguments); }")(binder);
     if (target.prototype) {
-      var Empty = function Empty() {};
+      var Empty = function Empty2() {};
       Empty.prototype = target.prototype;
       bound.prototype = new Empty;
       Empty.prototype = null;
@@ -16843,7 +16831,7 @@ var require_get_intrinsic = __commonJS((exports, module) => {
     }
   }
   var errorProto;
-  var doEval = function doEval(name) {
+  var doEval = function doEval2(name) {
     var value;
     if (name === "%AsyncFunction%") {
       value = getEvalledConstructor("async function () {}");
@@ -16852,12 +16840,12 @@ var require_get_intrinsic = __commonJS((exports, module) => {
     } else if (name === "%AsyncGeneratorFunction%") {
       value = getEvalledConstructor("async function* () {}");
     } else if (name === "%AsyncGenerator%") {
-      var fn = doEval("%AsyncGeneratorFunction%");
+      var fn = doEval2("%AsyncGeneratorFunction%");
       if (fn) {
         value = fn.prototype;
       }
     } else if (name === "%AsyncIteratorPrototype%") {
-      var gen = doEval("%AsyncGenerator%");
+      var gen = doEval2("%AsyncGenerator%");
       if (gen && getProto) {
         value = getProto(gen.prototype);
       }
@@ -16928,7 +16916,7 @@ var require_get_intrinsic = __commonJS((exports, module) => {
   var $exec = bind.call($call, RegExp.prototype.exec);
   var rePropName = /[^%.[\]]+|\[(?:(-?\d+(?:\.\d+)?)|(["'])((?:(?!\2)[^\\]|\\.)*?)\2)\]|(?=(?:\.|\[\])(?:\.|\[\]|%$))/g;
   var reEscapeChar = /\\(\\)?/g;
-  var stringToPath = function stringToPath(string) {
+  var stringToPath = function stringToPath2(string) {
     var first = $strSlice(string, 0, 1);
     var last = $strSlice(string, -1);
     if (first === "%" && last !== "%") {
@@ -16942,7 +16930,7 @@ var require_get_intrinsic = __commonJS((exports, module) => {
     });
     return result;
   };
-  var getBaseIntrinsic = function getBaseIntrinsic(name, allowMissing) {
+  var getBaseIntrinsic = function getBaseIntrinsic2(name, allowMissing) {
     var intrinsicName = name;
     var alias;
     if (hasOwn(LEGACY_ALIASES, intrinsicName)) {
@@ -17227,17 +17215,17 @@ var require_utils2 = __commonJS((exports, module) => {
   var has = Object.prototype.hasOwnProperty;
   var isArray = Array.isArray;
   var overflowChannel = getSideChannel();
-  var markOverflow = function markOverflow(obj, maxIndex) {
+  var markOverflow = function markOverflow2(obj, maxIndex) {
     overflowChannel.set(obj, maxIndex);
     return obj;
   };
-  var isOverflow = function isOverflow(obj) {
+  var isOverflow = function isOverflow2(obj) {
     return overflowChannel.has(obj);
   };
-  var getMaxIndex = function getMaxIndex(obj) {
+  var getMaxIndex = function getMaxIndex2(obj) {
     return overflowChannel.get(obj);
   };
-  var setMaxIndex = function setMaxIndex(obj, maxIndex) {
+  var setMaxIndex = function setMaxIndex2(obj, maxIndex) {
     overflowChannel.set(obj, maxIndex);
   };
   var hexTable = function() {
@@ -17247,7 +17235,7 @@ var require_utils2 = __commonJS((exports, module) => {
     }
     return array;
   }();
-  var compactQueue = function compactQueue(queue) {
+  var compactQueue = function compactQueue2(queue) {
     while (queue.length > 1) {
       var item = queue.pop();
       var obj = item.obj[item.prop];
@@ -17262,7 +17250,7 @@ var require_utils2 = __commonJS((exports, module) => {
       }
     }
   };
-  var arrayToObject = function arrayToObject(source, options) {
+  var arrayToObject = function arrayToObject2(source, options) {
     var obj = options && options.plainObjects ? { __proto__: null } : {};
     for (var i = 0;i < source.length; ++i) {
       if (typeof source[i] !== "undefined") {
@@ -17271,7 +17259,7 @@ var require_utils2 = __commonJS((exports, module) => {
     }
     return obj;
   };
-  var merge = function merge(target, source, options) {
+  var merge = function merge2(target, source, options) {
     if (!source) {
       return target;
     }
@@ -17312,7 +17300,7 @@ var require_utils2 = __commonJS((exports, module) => {
         if (has.call(target, i)) {
           var targetItem = target[i];
           if (targetItem && typeof targetItem === "object" && item && typeof item === "object") {
-            target[i] = merge(targetItem, item, options);
+            target[i] = merge2(targetItem, item, options);
           } else {
             target.push(item);
           }
@@ -17325,7 +17313,7 @@ var require_utils2 = __commonJS((exports, module) => {
     return Object.keys(source).reduce(function(acc, key) {
       var value = source[key];
       if (has.call(acc, key)) {
-        acc[key] = merge(acc[key], value, options);
+        acc[key] = merge2(acc[key], value, options);
       } else {
         acc[key] = value;
       }
@@ -17350,7 +17338,7 @@ var require_utils2 = __commonJS((exports, module) => {
     }
   };
   var limit = 1024;
-  var encode = function encode(str, defaultEncoder, charset, kind, format) {
+  var encode = function encode2(str, defaultEncoder, charset, kind, format) {
     if (str.length === 0) {
       return str;
     }
@@ -17395,7 +17383,7 @@ var require_utils2 = __commonJS((exports, module) => {
     }
     return out;
   };
-  var compact = function compact(value) {
+  var compact = function compact2(value) {
     var queue = [{ obj: { o: value }, prop: "o" }];
     var refs = [];
     for (var i = 0;i < queue.length; ++i) {
@@ -17414,16 +17402,16 @@ var require_utils2 = __commonJS((exports, module) => {
     compactQueue(queue);
     return value;
   };
-  var isRegExp = function isRegExp(obj) {
+  var isRegExp = function isRegExp2(obj) {
     return Object.prototype.toString.call(obj) === "[object RegExp]";
   };
-  var isBuffer = function isBuffer(obj) {
+  var isBuffer = function isBuffer2(obj) {
     if (!obj || typeof obj !== "object") {
       return false;
     }
     return !!(obj.constructor && obj.constructor.isBuffer && obj.constructor.isBuffer(obj));
   };
-  var combine = function combine(a, b, arrayLimit, plainObjects) {
+  var combine = function combine2(a, b, arrayLimit, plainObjects) {
     if (isOverflow(a)) {
       var newIndex = getMaxIndex(a) + 1;
       a[newIndex] = b;
@@ -17436,7 +17424,7 @@ var require_utils2 = __commonJS((exports, module) => {
     }
     return result;
   };
-  var maybeMap = function maybeMap(val, fn) {
+  var maybeMap = function maybeMap2(val, fn) {
     if (isArray(val)) {
       var mapped = [];
       for (var i = 0;i < val.length; i += 1) {
@@ -17509,11 +17497,11 @@ var require_stringify = __commonJS((exports, module) => {
     skipNulls: false,
     strictNullHandling: false
   };
-  var isNonNullishPrimitive = function isNonNullishPrimitive(v) {
+  var isNonNullishPrimitive = function isNonNullishPrimitive2(v) {
     return typeof v === "string" || typeof v === "number" || typeof v === "boolean" || typeof v === "symbol" || typeof v === "bigint";
   };
   var sentinel = {};
-  var stringify = function stringify(object, prefix, generateArrayPrefix, commaRoundTrip, allowEmptyArrays, strictNullHandling, skipNulls, encodeDotInKeys, encoder, filter, sort, allowDots, serializeDate, format, formatter, encodeValuesOnly, charset, sideChannel) {
+  var stringify = function stringify2(object, prefix, generateArrayPrefix, commaRoundTrip, allowEmptyArrays, strictNullHandling, skipNulls, encodeDotInKeys, encoder, filter, sort, allowDots, serializeDate, format, formatter, encodeValuesOnly, charset, sideChannel) {
     var obj = object;
     var tmpSc = sideChannel;
     var step = 0;
@@ -17589,11 +17577,11 @@ var require_stringify = __commonJS((exports, module) => {
       sideChannel.set(object, step);
       var valueSideChannel = getSideChannel();
       valueSideChannel.set(sentinel, sideChannel);
-      pushToArray(values, stringify(value, keyPrefix, generateArrayPrefix, commaRoundTrip, allowEmptyArrays, strictNullHandling, skipNulls, encodeDotInKeys, generateArrayPrefix === "comma" && encodeValuesOnly && isArray(obj) ? null : encoder, filter, sort, allowDots, serializeDate, format, formatter, encodeValuesOnly, charset, valueSideChannel));
+      pushToArray(values, stringify2(value, keyPrefix, generateArrayPrefix, commaRoundTrip, allowEmptyArrays, strictNullHandling, skipNulls, encodeDotInKeys, generateArrayPrefix === "comma" && encodeValuesOnly && isArray(obj) ? null : encoder, filter, sort, allowDots, serializeDate, format, formatter, encodeValuesOnly, charset, valueSideChannel));
     }
     return values;
   };
-  var normalizeStringifyOptions = function normalizeStringifyOptions(opts) {
+  var normalizeStringifyOptions = function normalizeStringifyOptions2(opts) {
     if (!opts) {
       return defaults;
     }
@@ -17842,7 +17830,7 @@ var require_parse = __commonJS((exports, module) => {
     }
     return leaf;
   };
-  var splitKeyIntoSegments = function splitKeyIntoSegments(givenKey, options) {
+  var splitKeyIntoSegments = function splitKeyIntoSegments2(givenKey, options) {
     var key = options.allowDots ? givenKey.replace(/\.([^.[]+)/g, "[$1]") : givenKey;
     if (options.depth <= 0) {
       if (!options.plainObjects && has.call(Object.prototype, key)) {
@@ -17894,7 +17882,7 @@ var require_parse = __commonJS((exports, module) => {
     }
     return parseObject(keys, val, options, valuesParsed);
   };
-  var normalizeParseOptions = function normalizeParseOptions(opts) {
+  var normalizeParseOptions = function normalizeParseOptions2(opts) {
     if (!opts) {
       return defaults;
     }
@@ -18483,7 +18471,7 @@ var require_view = __commonJS((exports, module) => {
     });
     sync = false;
   };
-  View.prototype.resolve = function resolve(dir, file) {
+  View.prototype.resolve = function resolve2(dir, file) {
     var ext = this.ext;
     var path2 = join(dir, file);
     var stat = tryStat(path2);
@@ -19738,12 +19726,12 @@ var require_dist = __commonJS((exports) => {
     const { encode = encodeURIComponent, delimiter = DEFAULT_DELIMITER } = options;
     const data = typeof path === "object" ? path : parse(path, options);
     const fn = tokensToFunction(data.tokens, delimiter, encode);
-    return function path(params = {}) {
-      const [path2, ...missing] = fn(params);
+    return function path2(params = {}) {
+      const [path3, ...missing] = fn(params);
       if (missing.length) {
         throw new TypeError(`Missing parameters: ${missing.join(", ")}`);
       }
-      return path2;
+      return path3;
     };
   }
   function tokensToFunction(tokens, delimiter, encode) {
@@ -19809,7 +19797,7 @@ var require_dist = __commonJS((exports) => {
         return decode;
       return (value) => value.split(delimiter).map(decode);
     });
-    return function match(input) {
+    return function match2(input) {
       const m = regexp.exec(input);
       if (!m)
         return false;
@@ -20054,7 +20042,7 @@ var require_layer = __commonJS((exports, module) => {
     }
   };
   Layer.prototype.match = function match(path) {
-    let match;
+    let match2;
     if (path != null) {
       if (this.slash) {
         this.params = {};
@@ -20062,19 +20050,19 @@ var require_layer = __commonJS((exports, module) => {
         return true;
       }
       let i = 0;
-      while (!match && i < this.matchers.length) {
-        match = this.matchers[i](path);
+      while (!match2 && i < this.matchers.length) {
+        match2 = this.matchers[i](path);
         i++;
       }
     }
-    if (!match) {
+    if (!match2) {
       this.params = undefined;
       this.path = undefined;
       return false;
     }
-    this.params = match.params;
-    this.path = match.path;
-    this.keys = Object.keys(match.params);
+    this.params = match2.params;
+    this.path = match2.path;
+    this.keys = Object.keys(match2.params);
     return true;
   };
   function decodeParam(val) {
@@ -20442,18 +20430,18 @@ var require_router = __commonJS((exports, module) => {
     return this;
   };
   Router.prototype.route = function route(path) {
-    const route = new Route(path);
+    const route2 = new Route(path);
     const layer = new Layer(path, {
       sensitive: this.caseSensitive,
       strict: this.strict,
       end: true
     }, handle);
     function handle(req, res, next) {
-      route.dispatch(req, res, next);
+      route2.dispatch(req, res, next);
     }
-    layer.route = route;
+    layer.route = route2;
     this.stack.push(layer);
-    return route;
+    return route2;
   };
   methods.concat("all").forEach(function(method) {
     Router.prototype[method] = function(path) {
@@ -21052,7 +21040,7 @@ var require_encoding = __commonJS((exports, module) => {
   }
   function preferredEncodings(accept, provided, preferred) {
     var accepts = parseAcceptEncoding(accept || "");
-    var comparator = preferred ? function comparator(a, b) {
+    var comparator = preferred ? function comparator2(a, b) {
       if (a.q !== b.q) {
         return b.q - a.q;
       }
@@ -21697,10 +21685,10 @@ var require_request = __commonJS((exports, module) => {
     return accepts(this).languages(...languages);
   };
   req.range = function range(size, options) {
-    var range = this.get("Range");
-    if (!range)
+    var range2 = this.get("Range");
+    if (!range2)
       return;
-    return parseRange(size, range, options);
+    return parseRange(size, range2, options);
   };
   defineGetter(req, "query", function query() {
     var queryparse = this.app.get("query parser fn");
@@ -21748,8 +21736,8 @@ var require_request = __commonJS((exports, module) => {
     if (!hostname)
       return [];
     var offset = this.app.get("subdomain offset");
-    var subdomains = !isIP(hostname) ? hostname.split(".").reverse() : [hostname];
-    return subdomains.slice(offset);
+    var subdomains2 = !isIP(hostname) ? hostname.split(".").reverse() : [hostname];
+    return subdomains2.slice(offset);
   });
   defineGetter(req, "path", function path() {
     return parse(this).pathname;
@@ -22388,7 +22376,7 @@ var require_send = __commonJS((exports, module) => {
     this.sendFile(path2);
     return res;
   };
-  SendStream.prototype.send = function send(path2, stat) {
+  SendStream.prototype.send = function send2(path2, stat) {
     var len = stat.size;
     var options = this.options;
     var opts = {};
@@ -22513,18 +22501,18 @@ var require_send = __commonJS((exports, module) => {
   SendStream.prototype.stream = function stream(path2, options) {
     var self = this;
     var res = this.res;
-    var stream = fs.createReadStream(path2, options);
-    this.emit("stream", stream);
-    stream.pipe(res);
+    var stream2 = fs.createReadStream(path2, options);
+    this.emit("stream", stream2);
+    stream2.pipe(res);
     function cleanup() {
-      stream.destroy();
+      stream2.destroy();
     }
     onFinished(res, cleanup);
-    stream.on("error", function onerror(err) {
+    stream2.on("error", function onerror(err) {
       cleanup();
       self.onStatError(err);
     });
-    stream.on("end", function onend() {
+    stream2.on("end", function onend() {
       self.emit("end");
     });
   };
@@ -22533,9 +22521,9 @@ var require_send = __commonJS((exports, module) => {
     if (res.getHeader("Content-Type"))
       return;
     var ext = extname(path2);
-    var type = mime.contentType(ext) || "application/octet-stream";
-    debug("content-type %s", type);
-    res.setHeader("Content-Type", type);
+    var type2 = mime.contentType(ext) || "application/octet-stream";
+    debug("content-type %s", type2);
+    res.setHeader("Content-Type", type2);
   };
   SendStream.prototype.setHeader = function setHeader(path2, stat) {
     var res = this.res;
@@ -22797,7 +22785,7 @@ var require_response = __commonJS((exports, module) => {
       }
     }).join(", "));
   };
-  res.send = function send(body) {
+  res.send = function send2(body) {
     var chunk = body;
     var encoding;
     var req = this.req;
@@ -23259,7 +23247,7 @@ var require_serve_static = __commonJS((exports, module) => {
     opts.maxage = opts.maxage || opts.maxAge || 0;
     opts.root = resolve(root);
     var onDirectory = redirect ? createRedirectDirectoryListener() : createNotFoundDirectoryListener();
-    return function serveStatic(req, res, next) {
+    return function serveStatic2(req, res, next) {
       if (req.method !== "GET" && req.method !== "HEAD") {
         if (fallthrough) {
           return next();
@@ -23386,18 +23374,6 @@ var require_express = __commonJS((exports, module) => {
   exports.static = require_serve_static();
   exports.text = bodyParser.text;
   exports.urlencoded = bodyParser.urlencoded;
-});
-
-// node_modules/express/index.js
-var require_express2 = __commonJS((exports, module) => {
-  /*!
-   * express
-   * Copyright(c) 2009-2013 TJ Holowaychuk
-   * Copyright(c) 2013 Roman Shtylman
-   * Copyright(c) 2014-2015 Douglas Christopher Wilson
-   * MIT Licensed
-   */
-  module.exports = require_express();
 });
 
 // node_modules/object-assign/index.js
@@ -29922,7 +29898,7 @@ var require_formats2 = __commonJS((exports) => {
   }
   var TIME = /^(\d\d):(\d\d):(\d\d(?:\.\d+)?)(z|([+-])(\d\d)(?::?(\d\d))?)?$/i;
   function getTime(strictTimeZone) {
-    return function time(str) {
+    return function time3(str) {
       const matches = TIME.exec(str);
       if (!matches)
         return false;
@@ -30136,7 +30112,7 @@ var require_dist2 = __commonJS((exports, module) => {
 });
 
 // node_modules/@modelcontextprotocol/sdk/dist/esm/server/express.js
-var import_express = __toESM(require_express2(), 1);
+var import_express = __toESM(require_express(), 1);
 
 // node_modules/@modelcontextprotocol/sdk/dist/esm/server/middleware/hostHeaderValidation.js
 function hostHeaderValidation(allowedHostnames) {

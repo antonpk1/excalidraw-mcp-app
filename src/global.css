@@ -103,14 +103,16 @@ body {
   z-index: 100;
   opacity: 0;
   transition: opacity 0.2s ease;
+  display: flex;
+  gap: 4px;
 }
 
 .main:hover .toolbar {
   opacity: 1;
 }
 
-/* Fullscreen button */
-.fullscreen-btn {
+/* Toolbar buttons (shared style for fullscreen, edit, export) */
+.toolbar-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -129,14 +131,14 @@ body {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
-.fullscreen-btn:hover {
+.toolbar-btn:hover {
   color: rgba(0, 0, 0, 0.7);
   background: rgba(255, 255, 255, 0.8);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
 }
 
 /* Hide fullscreen button in fullscreen mode (host provides exit UI) */
-.main.fullscreen .fullscreen-btn {
+.main.fullscreen .toolbar-btn {
   display: none !important;
 }
 
@@ -168,6 +170,49 @@ body {
 
 .excalidraw-container .excalidraw .App-menu_top__left {
   visibility: hidden !important;
+}
+
+/* Inline editor: show Excalidraw toolbars so user can actually draw */
+.main.inline-editing .excalidraw .App-toolbar {
+  display: flex !important;
+}
+
+.main.inline-editing .excalidraw .App-menu_top {
+  display: flex !important;
+}
+
+.main.inline-editing .excalidraw .App-menu_top__left {
+  visibility: visible !important;
+}
+
+.main.inline-editing .excalidraw .layer-ui__wrapper__footer {
+  display: flex !important;
+}
+
+.main.inline-editing .excalidraw .undo-redo-buttons {
+  display: flex !important;
+}
+
+/* Inline editor container — overlays the SVG, fills the same space */
+.inline-editor-container {
+  width: 100%;
+  overflow: hidden;
+}
+
+/* Ensure Excalidraw fills the inline editor container height */
+.inline-editor-container .excalidraw-container,
+.inline-editor-container .excalidraw {
+  height: 100% !important;
+}
+
+/* Make main relative so the editor overlay can be positioned */
+.main.inline-editing {
+  position: relative;
+}
+
+/* Keep toolbar visible while inline editing */
+.main.inline-editing .toolbar {
+  opacity: 1;
 }
 
 

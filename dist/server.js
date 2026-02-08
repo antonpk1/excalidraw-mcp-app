@@ -6275,7 +6275,7 @@ var require_formats = __commonJS((exports) => {
   }
   var TIME = /^(\d\d):(\d\d):(\d\d(?:\.\d+)?)(z|([+-])(\d\d)(?::?(\d\d))?)?$/i;
   function getTime(strictTimeZone) {
-    return function time(str) {
+    return function time3(str) {
       const matches = TIME.exec(str);
       if (!matches)
         return false;

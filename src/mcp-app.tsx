@@ -86,6 +86,46 @@ const ExternalLinkIcon = () => (
   </svg>
 );
 
+const EditIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M11.333 2A1.886 1.886 0 0 1 14 4.667L5.333 13.333 2 14l.667-3.333L11.333 2z" />
+  </svg>
+);
+
+const CheckIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M13.333 4L6 11.333 2.667 8" />
+  </svg>
+);
+
+/**
+ * Export elements to excalidraw.com — works with either the Excalidraw API
+ * (from the editor) or raw converted elements (from inline SVG preview).
+ */
+async function exportElements(app: App, elements: any[], appState?: any, files?: any) {
+  try {
+    if (!elements?.length) return;
+    const json = serializeAsJSON(
+      elements,
+      appState ?? { viewBackgroundColor: "#ffffff", exportBackground: true },
+      files ?? {},
+      "database",
+    );
+    const result = await app.callServerTool({
+      name: "export_to_excalidraw",
+      arguments: { json },
+    });
+    if (result.isError) {
+      fsLog(`export failed: ${JSON.stringify(result.content)}`);
+      return;
+    }
+    const url = (result.content[0] as any).text;
+    await app.openLink({ url });
+  } catch (err) {
+    fsLog(`exportElements error: ${err}`);
+  }
+}
+
 async function shareToExcalidraw(api: any, app: App) {
   try {
     const elements = api.getSceneElements();
@@ -501,7 +541,7 @@ function DiagramView({ toolInput, isFinal, displayMode, onElements, editedElemen
     <div
       ref={svgRef}
       className="excalidraw-container"
-      style={{ display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}
+      style={{ display: "flex", alignItems: "center", justifyContent: "center" }}
     />
   );
 }
@@ -519,6 +559,8 @@ function ExcalidrawApp() {
   const [editorReady, setEditorReady] = useState(false);
   const [excalidrawApi, setExcalidrawApi] = useState<any>(null);
   const [editorSettled, setEditorSettled] = useState(false);
+  const [canFullscreen, setCanFullscreen] = useState(false); // default false, enabled when host reports fullscreen support
+  const [inlineEditing, setInlineEditing] = useState(false);
   const appRef = useRef<App | null>(null);
   const svgViewportRef = useRef<ViewportRect | null>(null);
   const elementsRef = useRef<any[]>([]);
@@ -545,6 +587,20 @@ function ExcalidrawApp() {
     }
   }, [displayMode, elements.length, inputIsFinal]);
 
+  const toggleInlineEdit = useCallback(() => {
+    if (inlineEditing) {
+      // Leaving edit mode — sync edits back
+      const edited = getLatestEditedElements();
+      if (edited) {
+        setElements(edited);
+        setUserEdits(edited);
+      }
+    }
+    setInlineEditing((prev) => !prev);
+  }, [inlineEditing]);
+
+  const isInlineEdit = displayMode === "inline" && inlineEditing;
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape" && displayMode === "fullscreen") toggleFullscreen();
@@ -566,9 +622,9 @@ function ExcalidrawApp() {
     ]).catch(() => {});
   }, []);
 
-  // Mount editor when entering fullscreen
+  // Mount editor when entering fullscreen or inline editing
   useEffect(() => {
-    if (displayMode !== "fullscreen") {
+    if (displayMode !== "fullscreen" && !inlineEditing) {
       setEditorReady(false);
       setExcalidrawApi(null);
       setEditorSettled(false);
@@ -578,10 +634,10 @@ function ExcalidrawApp() {
       await document.fonts.ready;
       setTimeout(() => setEditorReady(true), 200);
     })();
-  }, [displayMode]);
+  }, [displayMode, inlineEditing]);
 
   // After editor mounts: refresh text dimensions, then reveal
-  const mountEditor = displayMode === "fullscreen" && inputIsFinal && elements.length > 0 && editorReady;
+  const mountEditor = (displayMode === "fullscreen" || inlineEditing) && inputIsFinal && elements.length > 0 && editorReady;
   useEffect(() => {
     if (!mountEditor || !excalidrawApi) return;
     if (editorSettled) return; // already revealed, don't redo
@@ -634,6 +690,13 @@ function ExcalidrawApp() {
           }
           setDisplayMode(ctx.displayMode as "inline" | "fullscreen");
         }
+        // Detect whether fullscreen is available on this host
+        if (ctx.availableDisplayModes) {
+          setCanFullscreen(ctx.availableDisplayModes.includes("fullscreen"));
+        } else {
+          // Host doesn't report available modes — assume only current mode is supported
+          setCanFullscreen(false);
+        }
       };
 
       app.ontoolinputpartial = async (input) => {
@@ -645,14 +708,16 @@ function ExcalidrawApp() {
       app.ontoolinput = async (input) => {
         const args = (input as any)?.arguments || input;
         // Use the JSON-RPC tool call ID as localStorage key (stable across reloads)
-        const toolCallId = String(app.getHostContext()?.toolInfo?.id ?? "default");
-        setStorageKey(toolCallId);
-        // Check for persisted edits from a previous fullscreen session
-        const persisted = loadPersistedElements();
-        if (persisted && persisted.length > 0) {
-          elementsRef.current = persisted;
-          setElements(persisted);
-          setUserEdits(persisted);
+        const toolCallId = String(app.getHostContext()?.toolInfo?.id ?? "");
+        if (toolCallId) {
+          setStorageKey(toolCallId);
+          // Check for persisted edits from a previous session
+          const persisted = loadPersistedElements();
+          if (persisted && persisted.length > 0) {
+            elementsRef.current = persisted;
+            setElements(persisted);
+            setUserEdits(persisted);
+          }
         }
         setInputIsFinal(true);
         setToolInput(args);
@@ -686,27 +751,46 @@ function ExcalidrawApp() {
   if (!app) return <div className="loading">Connecting...</div>;
 
   return (
-    <main className={`main${displayMode === "fullscreen" ? " fullscreen" : ""}`}>
+    <main className={`main${displayMode === "fullscreen" ? " fullscreen" : ""}${isInlineEdit ? " inline-editing" : ""}`}>
       {displayMode === "inline" && (
         <div className="toolbar">
-          <button
-            className="fullscreen-btn"
-            onClick={toggleFullscreen}
-            title="Enter fullscreen"
-          >
-            <ExpandIcon />
-          </button>
+          {inputIsFinal && elements.length > 0 && (
+            <button
+              className="toolbar-btn"
+              onClick={() => exportElements(app, elementsRef.current)}
+              title="Export to Excalidraw"
+            >
+              <ExternalLinkIcon />
+            </button>
+          )}
+          {!canFullscreen && inputIsFinal && elements.length > 0 && (
+            <button
+              className="toolbar-btn"
+              onClick={toggleInlineEdit}
+              title={inlineEditing ? "Done editing" : "Edit diagram"}
+            >
+              {inlineEditing ? <CheckIcon /> : <EditIcon />}
+            </button>
+          )}
+          {canFullscreen && (
+            <button
+              className="toolbar-btn"
+              onClick={toggleFullscreen}
+              title="Enter fullscreen"
+            >
+              <ExpandIcon />
+            </button>
+          )}
         </div>
       )}
       {/* Editor: mount hidden when ready, reveal after viewport is set */}
       {mountEditor && (
         <div style={{
           width: "100%",
-          height: "100vh",
+          height: displayMode === "fullscreen" ? "100vh" : undefined,
           visibility: editorSettled ? "visible" : "hidden",
-          position: editorSettled ? undefined : "absolute",
-          inset: editorSettled ? undefined : 0,
-        }}>
+          ...(isInlineEdit && editorSettled ? { position: "absolute" as const, top: 0, left: 0, right: 0, bottom: 0, zIndex: 10 } : !editorSettled ? { position: "absolute" as const, inset: 0 } : {}),
+        }} className={isInlineEdit ? "inline-editor-container" : undefined}>
           <Excalidraw
             excalidrawAPI={(api) => { setExcalidrawApi(api); fsLog(`excalidrawAPI set`); }}
             initialData={{ elements: elements as any, scrollToContent: true }}
@@ -722,11 +806,11 @@ function ExcalidrawApp() {
           />
         </div>
       )}
-      {/* SVG: stays visible until editor is fully settled */}
-      {!editorSettled && (
+      {/* SVG: always rendered for layout height; hidden visually when editor is active */}
+      {(!editorSettled || isInlineEdit) && (
         <div
           onClick={undefined}
-          style={undefined}
+          style={isInlineEdit && editorSettled ? { visibility: "hidden" as const } : undefined}
         >
           <DiagramView toolInput={toolInput} isFinal={inputIsFinal} displayMode={displayMode} onElements={(els) => { elementsRef.current = els; setElements(els); }} editedElements={userEdits ?? undefined} onViewport={(vp) => { svgViewportRef.current = vp; }} />
         </div>
