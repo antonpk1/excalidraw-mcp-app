@@ -258,7 +258,7 @@ function DiagramView({ toolInput, isFinal, displayMode, onElements, editedElemen
   useEffect(() => {
     if (!svgRef.current) return;
     if (displayMode === "fullscreen") {
-      svgRef.current.style.height = "100vh";
+      svgRef.current.style.height = "100%";
       return;
     }
     const observer = new ResizeObserver(([entry]) => {
@@ -564,6 +564,7 @@ function ExcalidrawApp() {
   const [displayMode, setDisplayMode] = useState<"inline" | "fullscreen">("inline");
   const [elements, setElements] = useState<any[]>([]);
   const [userEdits, setUserEdits] = useState<any[] | null>(null);
+  const [containerHeight, setContainerHeight] = useState<number | null>(null);
   const [editorReady, setEditorReady] = useState(false);
   const [excalidrawApi, setExcalidrawApi] = useState<any>(null);
   const [editorSettled, setEditorSettled] = useState(false);
@@ -613,6 +614,18 @@ function ExcalidrawApp() {
       document.fonts.load('700 16px Assistant'),
     ]).catch(() => {});
   }, []);
+
+  // Set explicit height on html/body in fullscreen (position:fixed doesn't give body height in iframes)
+  useEffect(() => {
+    if (displayMode === "fullscreen" && containerHeight) {
+      const h = `${containerHeight}px`;
+      document.documentElement.style.height = h;
+      document.body.style.height = h;
+    } else {
+      document.documentElement.style.height = "";
+      document.body.style.height = "";
+    }
+  }, [displayMode, containerHeight]);
 
   // Mount editor when entering fullscreen
   useEffect(() => {
@@ -668,7 +681,14 @@ function ExcalidrawApp() {
       appRef.current = app;
       _logFn = (msg) => { try { app.sendLog({ level: "info", logger: "FS", data: msg }); } catch {} };
 
+      // Capture initial container dimensions
+      const initDims = app.getHostContext()?.containerDimensions as any;
+      if (initDims?.height) setContainerHeight(initDims.height);
+
       app.onhostcontextchanged = (ctx: any) => {
+        if (ctx.containerDimensions?.height) {
+          setContainerHeight(ctx.containerDimensions.height);
+        }
         if (ctx.displayMode) {
           fsLog(`hostContextChanged: displayMode=${ctx.displayMode}`);
           // Sync edited elements when host exits fullscreen
@@ -721,7 +741,7 @@ function ExcalidrawApp() {
   if (!app) return <div className="loading">Connecting...</div>;
 
   return (
-    <main className={`main${displayMode === "fullscreen" ? " fullscreen" : ""}`}>
+    <main className={`main${displayMode === "fullscreen" ? " fullscreen" : ""}`} style={displayMode === "fullscreen" && containerHeight ? { height: containerHeight } : undefined}>
       {displayMode === "inline" && (
         <div className="toolbar">
           <button
@@ -737,7 +757,7 @@ function ExcalidrawApp() {
       {mountEditor && (
         <div style={{
           width: "100%",
-          height: "100vh",
+          height: "100%",
           visibility: editorSettled ? "visible" : "hidden",
           position: editorSettled ? undefined : "absolute",
           inset: editorSettled ? undefined : 0,
@@ -778,4 +798,4 @@ function ExcalidrawApp() {
   );
 }
 
-createRoot(document.getElementById("root")!).render(<ExcalidrawApp />);
+createRoot(document.body).render(<ExcalidrawApp />);
