@@ -82,7 +82,7 @@ body {
 }
 
 .main.fullscreen .excalidraw-container {
-  height: 100vh;
+  height: 100%;
 }
 
 /* Hide library button in fullscreen editor */
@@ -92,7 +92,7 @@ body {
 
 /* Contain SVG inside fullscreen viewport (not cover) */
 .main.fullscreen .svg-wrapper svg {
-  max-height: 100vh;
+  max-height: 100%;
 }
 
 /* Toolbar - appears on hover */
@@ -251,7 +251,7 @@ body {
 }
 
 .main.fullscreen .html-container {
-  height: 100vh;
+  height: 100%;
 }
 
 /* Export modal overlay */
