@@ -565,6 +565,8 @@ function ExcalidrawApp() {
   const [elements, setElements] = useState<any[]>([]);
   const [userEdits, setUserEdits] = useState<any[] | null>(null);
   const [containerHeight, setContainerHeight] = useState<number | null>(null);
+  const [canFullscreen, setCanFullscreen] = useState(false);
+  const [containerMaxHeight, setContainerMaxHeight] = useState<number | null>(null);
   const [editorReady, setEditorReady] = useState(false);
   const [excalidrawApi, setExcalidrawApi] = useState<any>(null);
   const [editorSettled, setEditorSettled] = useState(false);
@@ -572,6 +574,7 @@ function ExcalidrawApp() {
   const svgViewportRef = useRef<ViewportRect | null>(null);
   const elementsRef = useRef<any[]>([]);
   const checkpointIdRef = useRef<string | null>(null);
+  const lastInputRef = useRef<string | null>(null);
 
   const toggleFullscreen = useCallback(async () => {
     if (!appRef.current) return;
@@ -627,9 +630,9 @@ function ExcalidrawApp() {
     }
   }, [displayMode, containerHeight]);
 
-  // Mount editor when entering fullscreen
+  // Mount editor when entering fullscreen or when host doesn't support fullscreen
   useEffect(() => {
-    if (displayMode !== "fullscreen") {
+    if (displayMode !== "fullscreen" && canFullscreen) {
       setEditorReady(false);
       setExcalidrawApi(null);
       setEditorSettled(false);
@@ -639,10 +642,10 @@ function ExcalidrawApp() {
       await document.fonts.ready;
       setTimeout(() => setEditorReady(true), 200);
     })();
-  }, [displayMode]);
+  }, [displayMode, canFullscreen]);
 
   // After editor mounts: refresh text dimensions, then reveal
-  const mountEditor = displayMode === "fullscreen" && inputIsFinal && elements.length > 0 && editorReady;
+  const mountEditor = (displayMode === "fullscreen" || !canFullscreen) && inputIsFinal && elements.length > 0 && editorReady;
   useEffect(() => {
     if (!mountEditor || !excalidrawApi) return;
     if (editorSettled) return; // already revealed, don't redo
@@ -681,13 +684,24 @@ function ExcalidrawApp() {
       appRef.current = app;
       _logFn = (msg) => { try { app.sendLog({ level: "info", logger: "FS", data: msg }); } catch {} };
 
-      // Capture initial container dimensions
-      const initDims = app.getHostContext()?.containerDimensions as any;
+      // Capture initial container dimensions and host capabilities
+      const initCtx = app.getHostContext() as any;
+      const initDims = initCtx?.containerDimensions;
       if (initDims?.height) setContainerHeight(initDims.height);
+      if (initDims?.maxHeight) setContainerMaxHeight(initDims.maxHeight);
+      if (initCtx?.availableDisplayModes) {
+        setCanFullscreen(initCtx.availableDisplayModes.includes("fullscreen"));
+      }
 
       app.onhostcontextchanged = (ctx: any) => {
         if (ctx.containerDimensions?.height) {
           setContainerHeight(ctx.containerDimensions.height);
+        }
+        if (ctx.containerDimensions?.maxHeight) {
+          setContainerMaxHeight(ctx.containerDimensions.maxHeight);
+        }
+        if (ctx.availableDisplayModes) {
+          setCanFullscreen(ctx.availableDisplayModes.includes("fullscreen"));
         }
         if (ctx.displayMode) {
           fsLog(`hostContextChanged: displayMode=${ctx.displayMode}`);
@@ -711,6 +725,9 @@ function ExcalidrawApp() {
 
       app.ontoolinput = async (input) => {
         const args = (input as any)?.arguments || input;
+        const sig = JSON.stringify(args);
+        if (lastInputRef.current === sig) return;
+        lastInputRef.current = sig;
         setInputIsFinal(true);
         setToolInput(args);
       };
@@ -718,6 +735,7 @@ function ExcalidrawApp() {
       app.ontoolresult = (result: any) => {
         const cpId = (result.structuredContent as { checkpointId?: string })?.checkpointId;
         if (cpId) {
+          if (cpId === checkpointIdRef.current) return;
           checkpointIdRef.current = cpId;
           setCheckpointId(cpId);
           // Use checkpointId as localStorage key for persisting user edits
@@ -741,11 +759,11 @@ function ExcalidrawApp() {
   if (!app) return <div className="loading">Connecting...</div>;
 
   return (
-    <main className={`main${displayMode === "fullscreen" ? " fullscreen" : ""}`} style={displayMode === "fullscreen" && containerHeight ? { height: containerHeight } : undefined}>
-      {displayMode === "inline" && (
+    <main className={`main${displayMode === "fullscreen" ? " fullscreen" : ""}${!canFullscreen && mountEditor ? " inline-editor" : ""}`} style={displayMode === "fullscreen" && containerHeight ? { height: containerHeight } : !canFullscreen && mountEditor ? { height: containerMaxHeight ?? 500 } : undefined}>
+      {displayMode === "inline" && canFullscreen && (
         <div className="toolbar">
           <button
-            className="fullscreen-btn"
+            className="toolbar-btn"
             onClick={toggleFullscreen}
             title="Enter fullscreen"
           >
