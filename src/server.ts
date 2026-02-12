@@ -8,6 +8,9 @@ import { deflateSync } from "node:zlib";
 import { z } from "zod/v4";
 import type { CheckpointStore } from "./checkpoint-store.js";
 
+/** Maximum allowed size for element/data input strings (5 MB). */
+const MAX_INPUT_BYTES = 5 * 1024 * 1024;
+
 // Works both from source (src/server.ts) and compiled (dist/server.js)
 const DIST_DIR = import.meta.filename.endsWith(".ts")
   ? path.join(import.meta.dirname, "..", "dist")
@@ -431,6 +434,12 @@ Call read_me first to learn the element format.`,
       _meta: { ui: { resourceUri } },
     },
     async ({ elements }): Promise<CallToolResult> => {
+      if (elements.length > MAX_INPUT_BYTES) {
+        return {
+          content: [{ type: "text", text: `Elements input exceeds ${MAX_INPUT_BYTES} byte limit. Reduce the number of elements or use checkpoints to build incrementally.` }],
+          isError: true,
+        };
+      }
       let parsed: any[];
       try {
         parsed = JSON.parse(elements);
@@ -511,6 +520,12 @@ However, if the user wants to edit something on this diagram "${checkpointId}", 
       _meta: { ui: { visibility: ["app"] } },
     },
     async ({ json }): Promise<CallToolResult> => {
+      if (json.length > MAX_INPUT_BYTES) {
+        return {
+          content: [{ type: "text", text: `Export data exceeds ${MAX_INPUT_BYTES} byte limit.` }],
+          isError: true,
+        };
+      }
       try {
         // --- Excalidraw v2 binary format ---
         const remappedJson = json;
@@ -596,6 +611,12 @@ However, if the user wants to edit something on this diagram "${checkpointId}", 
       _meta: { ui: { visibility: ["app"] } },
     },
     async ({ id, data }): Promise<CallToolResult> => {
+      if (data.length > MAX_INPUT_BYTES) {
+        return {
+          content: [{ type: "text", text: `Checkpoint data exceeds ${MAX_INPUT_BYTES} byte limit.` }],
+          isError: true,
+        };
+      }
       try {
         await store.save(id, JSON.parse(data));
         return { content: [{ type: "text", text: "ok" }] };
