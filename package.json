@@ -2,6 +2,7 @@
   "name": "@mcp-demos/excalidraw-server",
   "version": "0.3.2",
   "type": "module",
+  "packageManager": "pnpm@10.11.0",
   "description": "Streamable Excalidraw diagram MCP App server",
   "license": "MIT",
   "main": "dist/server.js",
@@ -20,8 +21,8 @@
   },
   "scripts": {
     "postinstall": "node scripts/setup-bun.mjs || echo 'setup-bun.mjs failed or not available'",
-    "build": "tsc --noEmit && cross-env INPUT=src/mcp-app.html vite build && mv dist/src/mcp-app.html dist/mcp-app.html && rmdir dist/src && tsc -p tsconfig.server.json && bun build src/server.ts --outdir dist --target node && bun build src/main.ts --outfile dist/index.js --target node --banner \"#!/usr/bin/env node\"",
-    "watch": "cross-env INPUT=src/mcp-app.html vite build --watch",
+    "build": "node scripts/build.mjs",
+    "watch": "vite build --watch",
     "serve": "bun --watch src/main.ts",
     "start": "cross-env NODE_ENV=development npm run build && npm run serve",
     "dev": "cross-env NODE_ENV=development concurrently 'npm run watch' 'npm run serve'",
@@ -31,13 +32,13 @@
     "@excalidraw/excalidraw": "^0.18.0",
     "@modelcontextprotocol/ext-apps": "^0.4.0",
     "@modelcontextprotocol/sdk": "^1.24.0",
+    "@upstash/redis": "^1.34.0",
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "mcp-handler": "^1.0.7",
     "morphdom": "^2.7.8",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "@upstash/redis": "^1.34.0",
     "zod": "^4.0.0"
   },
   "devDependencies": {
@@ -49,6 +50,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "concurrently": "^9.2.1",
     "cross-env": "^10.1.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vite": "^6.0.0",
     "vite-plugin-singlefile": "^2.3.0"

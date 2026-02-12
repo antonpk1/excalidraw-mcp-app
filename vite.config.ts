@@ -1,15 +1,14 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { viteSingleFile } from "vite-plugin-singlefile";
 
-const INPUT = process.env.INPUT;
-if (!INPUT) {
-  throw new Error("INPUT environment variable is not set");
-}
-
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDevelopment = process.env.NODE_ENV === "development";
 
 export default defineConfig({
+  root: path.resolve(__dirname, "src"),
   plugins: [react(), viteSingleFile()],
   build: {
     sourcemap: isDevelopment ? "inline" : undefined,
@@ -17,7 +16,7 @@ export default defineConfig({
     minify: !isDevelopment,
 
     rollupOptions: {
-      input: INPUT,
+      input: path.resolve(__dirname, "src/mcp-app.html"),
       external: [
         "react",
         "react-dom",
@@ -37,7 +36,7 @@ export default defineConfig({
         },
       },
     },
-    outDir: "dist",
+    outDir: path.resolve(__dirname, "dist"),
     emptyOutDir: false,
   },
 });
