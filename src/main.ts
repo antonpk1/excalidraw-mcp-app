@@ -82,7 +82,7 @@ export async function startStdioServer(
 
 async function main() {
   const store = new FileCheckpointStore();
-  const factory = () => createServer(store);
+  const factory = () => createServer(store, { enableSnapshots: true });
   if (process.argv.includes("--stdio")) {
     await startStdioServer(factory);
   } else {

@@ -4,6 +4,22 @@ MCP server that streams hand-drawn Excalidraw diagrams with smooth viewport came
 
 ![Demo](docs/demo.gif)
 
+> **Works without MCP Apps too.** Clients that don't support MCP Apps (like Claude Code, Cursor, Windsurf) still get server-side rendered PNG snapshots saved to `/tmp/excalidraw-snapshots/`. The agent can reference these images for follow-up edits.
+
+## MCP Tools
+
+### `read_me`
+Returns the Excalidraw element format reference with color palettes, camera sizes, examples, and tips. Call this before using `create_view`.
+
+### `create_view` `[interactive]`
+Renders a hand-drawn diagram using Excalidraw elements with streaming draw-on animations. Elements stream in one by one with smooth camera panning.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `elements` | string (required) | JSON array of Excalidraw elements. Call `read_me` first for format reference. |
+
+**Returns**: Checkpoint ID for iterative edits, plus a PNG snapshot path (local mode).
+
 ## Install
 
 Works with any client that supports [MCP Apps](https://modelcontextprotocol.io/docs/extensions/apps) — Claude, ChatGPT, VS Code, Goose, and others. If something doesn't work, please [open an issue](https://github.com/antonpk1/excalidraw-mcp-app/issues).
