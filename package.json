@@ -31,13 +31,15 @@
     "@excalidraw/excalidraw": "^0.18.0",
     "@modelcontextprotocol/ext-apps": "^0.4.0",
     "@modelcontextprotocol/sdk": "^1.24.0",
+    "@resvg/resvg-wasm": "^2.6.2",
+    "@upstash/redis": "^1.34.0",
     "cors": "^2.8.5",
+    "excalirender": "github:JonRC/excalirender",
     "express": "^5.1.0",
     "mcp-handler": "^1.0.7",
     "morphdom": "^2.7.8",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "@upstash/redis": "^1.34.0",
     "zod": "^4.0.0"
   },
   "devDependencies": {

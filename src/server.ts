@@ -8,6 +8,11 @@ import { deflateSync } from "node:zlib";
 import { z } from "zod/v4";
 import type { CheckpointStore } from "./checkpoint-store.js";
 
+export interface ServerOptions {
+  /** Enable server-side PNG snapshot rendering (local/stdio only) */
+  enableSnapshots?: boolean;
+}
+
 // Works both from source (src/server.ts) and compiled (dist/server.js)
 const DIST_DIR = import.meta.filename.endsWith(".ts")
   ? path.join(import.meta.dirname, "..", "dist")
@@ -395,7 +400,8 @@ Use the Primary Colors from above — they're bright enough on dark backgrounds.
  * Registers all Excalidraw tools and resources on the given McpServer.
  * Shared between local (main.ts) and Vercel (api/mcp.ts) entry points.
  */
-export function registerTools(server: McpServer, distDir: string, store: CheckpointStore): void {
+export function registerTools(server: McpServer, distDir: string, store: CheckpointStore, options?: ServerOptions): void {
+  const enableSnapshots = options?.enableSnapshots ?? false;
   const resourceUri = "ui://excalidraw/mcp-app.html";
 
   // ============================================================
@@ -485,6 +491,14 @@ Call read_me first to learn the element format.`,
 
       const checkpointId = crypto.randomUUID().replace(/-/g, "").slice(0, 18);
       await store.save(checkpointId, { elements: resolvedElements });
+      let snapshotHint = "";
+      if (enableSnapshots) {
+        try {
+          const { renderSnapshot } = await import("./snapshot-renderer.js");
+          const result = await renderSnapshot(checkpointId, resolvedElements);
+          if (result) snapshotHint = `\nSnapshot: ${result.pngPath}\nExcalidraw file: ${result.excalidrawPath}`;
+        } catch { /* snapshot rendering is best-effort */ }
+      }
       return {
         content: [{ type: "text", text: `Diagram displayed! Checkpoint id: "${checkpointId}".
 If user asks to create a new diagram - simply create a new one from scratch.
@@ -493,7 +507,7 @@ However, if the user wants to edit something on this diagram "${checkpointId}", 
 2) decide whether you want to make new diagram from scratch OR - use this one as starting checkpoint:
   simply start from the first element [{"type":"restoreCheckpoint","id":"${checkpointId}"}, ...your new elements...]
   this will use same diagram state as the user currently sees, including any manual edits they made in fullscreen, allowing you to add elements on top.
-  To remove elements, use: {"type":"delete","ids":"<id1>,<id2>"}${ratioHint}` }],
+  To remove elements, use: {"type":"delete","ids":"<id1>,<id2>"}${ratioHint}${snapshotHint}` }],
         structuredContent: { checkpointId },
       };
     },
@@ -665,11 +679,11 @@ However, if the user wants to edit something on this diagram "${checkpointId}", 
  * Creates a new MCP server instance with Excalidraw drawing tools.
  * Used by local entry point (main.ts) and Docker deployments.
  */
-export function createServer(store: CheckpointStore): McpServer {
+export function createServer(store: CheckpointStore, options?: ServerOptions): McpServer {
   const server = new McpServer({
     name: "Excalidraw",
     version: "1.0.0",
   });
-  registerTools(server, DIST_DIR, store);
+  registerTools(server, DIST_DIR, store, options);
   return server;
 }
