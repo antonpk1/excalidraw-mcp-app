@@ -494,7 +494,8 @@ Call read_me first to learn the element format.`,
       let snapshotHint = "";
       if (enableSnapshots) {
         try {
-          const { renderSnapshot } = await import("./snapshot-renderer.js");
+          const mod = "./snapshot-renderer.js";
+          const { renderSnapshot } = await import(/* @vite-ignore */ mod);
           const result = await renderSnapshot(checkpointId, resolvedElements);
           if (result) snapshotHint = `\nSnapshot: ${result.pngPath}\nExcalidraw file: ${result.excalidrawPath}`;
         } catch { /* snapshot rendering is best-effort */ }
