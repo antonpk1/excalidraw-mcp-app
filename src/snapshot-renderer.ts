@@ -5,13 +5,14 @@
  * Isolated module — no coupling to MCP server logic.
  */
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { initWasm, Resvg } from "@resvg/resvg-wasm";
 import { exportToSvg } from "excalirender/src/export-svg/export.js";
 import type { ExportOptions } from "excalirender/src/types.js";
 
-const TMP_DIR = "/tmp/excalidraw-snapshots";
+const TMP_DIR = path.join(os.tmpdir(), "excalidraw-snapshots");
 
 // Resolve excalirender's bundled font directory
 const FONTS_DIR = path.join(
