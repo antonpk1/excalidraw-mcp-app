@@ -286,21 +286,37 @@ function DiagramView({ toolInput, isFinal, displayMode, onElements, editedElemen
   const sceneBoundsRef = useRef<{ minX: number; minY: number }>({ minX: 0, minY: 0 });
   const animFrameRef = useRef<number>(0);
 
-  /** Apply current animated scene-space viewport to the SVG. */
+  // User-controlled zoom during streaming (scale + pan offset in viewBox units)
+  const zoomRef = useRef({ scale: 1, panX: 0, panY: 0 });
+  const baseViewBoxRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
+
+  /** Apply user zoom on top of the stored base viewBox. */
+  const applyZoom = useCallback(() => {
+    if (!svgRef.current || !baseViewBoxRef.current) return;
+    const svg = svgRef.current.querySelector("svg");
+    if (!svg) return;
+    const { x, y, w, h } = baseViewBoxRef.current;
+    const { scale, panX, panY } = zoomRef.current;
+    const zw = w / scale;
+    const zh = h / scale;
+    svg.setAttribute("viewBox", `${x + (w - zw) / 2 + panX} ${y + (h - zh) / 2 + panY} ${zw} ${zh}`);
+  }, []);
+
+  /** Apply current animated scene-space viewport to the SVG, then user zoom. */
   const applyViewBox = useCallback(() => {
     if (!animatedVP.current || !svgRef.current) return;
     const svg = svgRef.current.querySelector("svg");
     if (!svg) return;
     const { minX, minY } = sceneBoundsRef.current;
-    // Auto-correct to 4:3 at render time (expand smaller dimension)
     const { x, y, width: w, height: h } = animatedVP.current;
     const ratio = w / h;
     const vp4x3: ViewportRect = Math.abs(ratio - 4 / 3) < 0.01 ? animatedVP.current
       : ratio > 4 / 3 ? { x, y, width: w, height: Math.round(w * 3 / 4) }
       : { x, y, width: Math.round(h * 4 / 3), height: h };
     const vb = sceneToSvgViewBox(vp4x3, minX, minY);
-    svg.setAttribute("viewBox", `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
-  }, []);
+    baseViewBoxRef.current = { x: vb.x, y: vb.y, w: vb.w, h: vb.h };
+    applyZoom();
+  }, [applyZoom]);
 
   /** Lerp scene-space viewport toward target each frame. */
   const animateViewBox = useCallback(() => {
@@ -367,9 +383,15 @@ function DiagramView({ toolInput, isFinal, displayMode, onElements, editedElemen
         wrapper.appendChild(svg);
       }
 
-      // Always fix SVG viewBox to 4:3
+      // Always fix SVG viewBox to 4:3, then store as base for user zoom
       const renderedSvg = wrapper.querySelector("svg");
-      if (renderedSvg) fixViewBox4x3(renderedSvg as SVGSVGElement);
+      if (renderedSvg) {
+        fixViewBox4x3(renderedSvg as SVGSVGElement);
+        const vbAttr = (renderedSvg as SVGSVGElement).getAttribute("viewBox")?.split(" ").map(Number);
+        if (vbAttr && vbAttr.length === 4) {
+          baseViewBoxRef.current = { x: vbAttr[0], y: vbAttr[1], w: vbAttr[2], h: vbAttr[3] };
+        }
+      }
 
       // Animate viewport in scene space, convert to SVG space at apply time
       if (viewport) {
@@ -397,11 +419,13 @@ function DiagramView({ toolInput, isFinal, displayMode, onElements, editedElemen
         animFrameRef.current = requestAnimationFrame(animateViewBox);
         targetVP.current = null;
         if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+        // Apply user zoom on top of the fixed viewBox
+        applyZoom();
       }
     } catch {
       // export can fail on partial/malformed elements
     }
-  }, [applyViewBox, animateViewBox]);
+  }, [applyViewBox, animateViewBox, applyZoom]);
 
   useEffect(() => {
     if (!toolInput) return;
@@ -540,16 +564,69 @@ function DiagramView({ toolInput, isFinal, displayMode, onElements, editedElemen
           wrapper.appendChild(svg);
         }
         const final = wrapper.querySelector("svg");
-        if (final) fixViewBox4x3(final as SVGSVGElement);
+        if (final) {
+          fixViewBox4x3(final as SVGSVGElement);
+          const vbAttr = (final as SVGSVGElement).getAttribute("viewBox")?.split(" ").map(Number);
+          if (vbAttr && vbAttr.length === 4) {
+            baseViewBoxRef.current = { x: vbAttr[0], y: vbAttr[1], w: vbAttr[2], h: vbAttr[3] };
+            applyZoom();
+          }
+        }
       } catch {}
     })();
-  }, [editedElements]);
+  }, [editedElements, applyZoom]);
+
+  // Zoom: pinch-to-zoom / Ctrl+scroll, pan when zoomed, double-click to reset
+  useEffect(() => {
+    const container = svgRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      const isZoomGesture = e.ctrlKey || e.metaKey;
+      const isZoomedIn = Math.abs(zoomRef.current.scale - 1) > 0.01;
+
+      if (!isZoomGesture && !isZoomedIn) return;
+      e.preventDefault();
+
+      const zoom = zoomRef.current;
+      if (isZoomGesture) {
+        const factor = e.deltaY > 0 ? 0.97 : 1.03;
+        const newScale = Math.max(0.25, Math.min(8, zoom.scale * factor));
+        if (baseViewBoxRef.current) {
+          const rect = container.getBoundingClientRect();
+          const mx = (e.clientX - rect.left) / rect.width;
+          const my = (e.clientY - rect.top) / rect.height;
+          const { w, h } = baseViewBoxRef.current;
+          zoom.panX += w * (1 / newScale - 1 / zoom.scale) * (0.5 - mx);
+          zoom.panY += h * (1 / newScale - 1 / zoom.scale) * (0.5 - my);
+        }
+        zoom.scale = newScale;
+      } else if (baseViewBoxRef.current) {
+        const { w, h } = baseViewBoxRef.current;
+        zoom.panX += (e.deltaX / container.clientWidth) * (w / zoom.scale);
+        zoom.panY += (e.deltaY / container.clientHeight) * (h / zoom.scale);
+      }
+      applyZoom();
+    };
+
+    const handleDblClick = () => {
+      zoomRef.current = { scale: 1, panX: 0, panY: 0 };
+      applyZoom();
+    };
+
+    container.addEventListener("wheel", handleWheel, { passive: false });
+    container.addEventListener("dblclick", handleDblClick);
+    return () => {
+      container.removeEventListener("wheel", handleWheel);
+      container.removeEventListener("dblclick", handleDblClick);
+    };
+  }, [applyZoom]);
 
   return (
     <div
       ref={svgRef}
       className="excalidraw-container"
-      style={{ display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}
+      style={{ display: "flex", alignItems: "center", justifyContent: "center" }}
     />
   );
 }
