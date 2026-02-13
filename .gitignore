@@ -4,3 +4,5 @@ dist/
 *.mcpb
 .vercel
 bun.lock
+.vscode
+opencode.json

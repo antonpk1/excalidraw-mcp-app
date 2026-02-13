@@ -1,11 +1,7 @@
+import path from "path";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { viteSingleFile } from "vite-plugin-singlefile";
-
-const INPUT = process.env.INPUT;
-if (!INPUT) {
-  throw new Error("INPUT environment variable is not set");
-}
 
 const isDevelopment = process.env.NODE_ENV === "development";
 
@@ -17,7 +13,7 @@ export default defineConfig({
     minify: !isDevelopment,
 
     rollupOptions: {
-      input: INPUT,
+      input: path.resolve(__dirname, "src/mcp-app.html"),
       external: [
         "react",
         "react-dom",
