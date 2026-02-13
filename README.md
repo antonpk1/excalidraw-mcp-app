@@ -1,3 +1,5 @@
+# test
+
 # Excalidraw MCP App Server
 
 MCP server that streams hand-drawn Excalidraw diagrams with smooth viewport camera control and interactive fullscreen editing.
