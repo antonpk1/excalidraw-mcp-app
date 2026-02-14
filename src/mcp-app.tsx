@@ -63,6 +63,127 @@ function isFullyInside(inner: { x: number; y: number; right: number; bottom: num
   return inner.x >= outer.x && inner.y >= outer.y && inner.right <= outer.right && inner.bottom <= outer.bottom;
 }
 
+const BINDABLE_SHAPES = new Set(["rectangle", "diamond", "ellipse"]);
+const MAX_BINDING_DIST = 80;
+
+function fixedPointForPoint(px: number, py: number, el: any): [number, number] {
+  const ex = el.x;
+  const ey = el.y;
+  const er = el.x + (el.width ?? 0);
+  const eb = el.y + (el.height ?? 0);
+  const cx = (ex + er) / 2;
+  const cy = (ey + eb) / 2;
+  const dx = Math.abs(px - cx);
+  const dy = Math.abs(py - cy);
+  if (dx > dy) return px < cx ? [0, 0.5] : [1, 0.5];
+  return py < cy ? [0.5, 0] : [0.5, 1];
+}
+
+function distToRect(px: number, py: number, el: any): number {
+  const ex = el.x;
+  const ey = el.y;
+  const er = el.x + (el.width ?? 0);
+  const eb = el.y + (el.height ?? 0);
+  const dx = Math.max(ex - px, 0, px - er);
+  const dy = Math.max(ey - py, 0, py - eb);
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+/** Ensure arrows have startBinding/endBinding to closest bindable shapes.
+ *  Also updates boundElements on target shapes so Excalidraw treats bindings correctly. */
+function ensureArrowBindings(elements: any[]): any[] {
+  const bindable = elements.filter((el: any) => BINDABLE_SHAPES.has(el.type));
+  const boundUpdates = new Map<string, { type: "arrow"; id: string }[]>();
+
+  const result = elements.map((el: any) => {
+    if (el.type !== "arrow" && el.type !== "line") return el;
+    const pts = el.points ?? [[0, 0], [el.width ?? 0, el.height ?? 0]];
+    const start = { x: el.x + pts[0][0], y: el.y + pts[0][1] };
+    const end = { x: el.x + pts[pts.length - 1][0], y: el.y + pts[pts.length - 1][1] };
+
+    let startBinding = el.startBinding;
+    let endBinding = el.endBinding;
+    if (!startBinding && bindable.length > 0) {
+      const best = bindable
+        .filter((b: any) => b.id !== el.id)
+        .map((b: any) => ({ el: b, d: distToRect(start.x, start.y, b) }))
+        .sort((a, b) => a.d - b.d)[0];
+      if (best && best.d <= MAX_BINDING_DIST) {
+        startBinding = { elementId: best.el.id, fixedPoint: fixedPointForPoint(start.x, start.y, best.el) };
+      }
+    }
+    if (!endBinding && bindable.length > 0) {
+      const best = bindable
+        .filter((b: any) => b.id !== el.id && b.id !== startBinding?.elementId)
+        .map((b: any) => ({ el: b, d: distToRect(end.x, end.y, b) }))
+        .sort((a, b) => a.d - b.d)[0];
+      if (best && best.d <= MAX_BINDING_DIST) {
+        endBinding = { elementId: best.el.id, fixedPoint: fixedPointForPoint(end.x, end.y, best.el) };
+      }
+    }
+    const arrowRef = { type: "arrow" as const, id: el.id };
+    if (startBinding) {
+      const cur = boundUpdates.get(startBinding.elementId) ?? [];
+      if (!cur.some((b) => b.id === el.id)) boundUpdates.set(startBinding.elementId, [...cur, arrowRef]);
+    }
+    if (endBinding && endBinding.elementId !== startBinding?.elementId) {
+      const cur = boundUpdates.get(endBinding.elementId) ?? [];
+      if (!cur.some((b) => b.id === el.id)) boundUpdates.set(endBinding.elementId, [...cur, arrowRef]);
+    }
+    return { ...el, startBinding: startBinding ?? el.startBinding, endBinding: endBinding ?? el.endBinding };
+  });
+
+  return result.map((el: any) => {
+    const add = boundUpdates.get(el.id);
+    if (!add) return el;
+    const existing = el.boundElements ?? [];
+    const merged = [...existing];
+    for (const ref of add) {
+      if (!merged.some((b: any) => b.id === ref.id)) merged.push(ref);
+    }
+    return { ...el, boundElements: merged };
+  });
+}
+
+/** Force triangle arrowhead on all arrows that have arrowheads. */
+function forceTriangleArrowhead(elements: any[]): any[] {
+  return elements.map((el: any) => {
+    if (el.type !== "arrow" && el.type !== "line") return el;
+    const start = el.startArrowhead != null && el.startArrowhead !== "none" ? "triangle" : el.startArrowhead;
+    const end = el.endArrowhead != null && el.endArrowhead !== "none" ? "triangle" : el.endArrowhead;
+    return { ...el, startArrowhead: start, endArrowhead: end };
+  });
+}
+
+/** Reorder elements: group containers (back) → arrows → nested shapes (front). */
+function reorderElementsForArrows(elements: any[]): any[] {
+  const drawable = elements.filter((el: any) => !PSEUDO_TYPES.has(el.type));
+  const containers = drawable.filter((el: any) => CONTAINER_SHAPES.has(el.type));
+  const arrows = drawable.filter((el: any) => el.type === "arrow" || el.type === "line");
+  const byArea = [...containers].sort((a, b) => (b.width * b.height) - (a.width * a.height));
+  const containerIds = new Set<string>();
+  const nestedIds = new Set<string>();
+  for (const p of byArea) {
+    const pb = elementBounds(p);
+    if (!pb) continue;
+    const children = drawable.filter((c: any) => c.id !== p.id && CONTAINER_SHAPES.has(c.type) && HAS_BOUNDS.has(c.type));
+    const inside = children.filter((c: any) => {
+      const cb = elementBounds(c);
+      return cb && isFullyInside(cb, pb);
+    });
+    if (inside.length === 0) continue;
+    containerIds.add(p.id);
+    inside.forEach((c: any) => nestedIds.add(c.id));
+  }
+  const arrowIds = new Set(arrows.map((a: any) => a.id));
+
+  const back = elements.filter((el: any) => containerIds.has(el.id));
+  const mid = elements.filter((el: any) => arrowIds.has(el.id));
+  const front = elements.filter((el: any) => nestedIds.has(el.id));
+  const other = elements.filter((el: any) => !containerIds.has(el.id) && !nestedIds.has(el.id) && !arrowIds.has(el.id));
+  return [...back, ...mid, ...front, ...other];
+}
+
 /** Assign groupIds so nested shapes form Excalidraw groups — click parent to select and move all. */
 function assignGroupIdsForNestedShapes(elements: any[]): any[] {
   const drawable = elements.filter((el: any) => !PSEUDO_TYPES.has(el.type));
@@ -467,9 +588,13 @@ function DiagramView({ toolInput, isFinal, displayMode, onElements, editedElemen
       // Update scene bounds from all elements
       sceneBoundsRef.current = computeSceneBounds(excalidrawEls);
 
-      const cleanEls = forceCleanStyle(excalidrawEls);
+      let processedEls = forceCleanStyle(excalidrawEls);
+      processedEls = ensureArrowBindings(processedEls);
+      processedEls = forceTriangleArrowhead(processedEls);
+      processedEls = assignGroupIdsForNestedShapes(processedEls);
+      processedEls = reorderElementsForArrows(processedEls);
       const svg = await exportToSvg({
-        elements: cleanEls as any,
+        elements: processedEls as any,
         appState: { viewBackgroundColor: "transparent", exportBackground: false } as any,
         files: null,
         exportPadding: EXPORT_PADDING,
@@ -571,9 +696,12 @@ function DiagramView({ toolInput, isFinal, displayMode, onElements, editedElemen
         // Convert new elements for fullscreen editor
         const convertedNew = convertRawElements(drawElements);
 
-        // Merge base (converted) + new converted, then auto-group nested shapes
+        // Merge base (converted) + new converted, then apply arrow fixes + auto-group
         let allConverted = base ? [...base, ...convertedNew] : convertedNew;
+        allConverted = ensureArrowBindings(allConverted);
+        allConverted = forceTriangleArrowhead(allConverted);
         allConverted = assignGroupIdsForNestedShapes(allConverted);
+        allConverted = reorderElementsForArrows(allConverted);
         captureInitialElements(allConverted);
         // Only set elements if user hasn't edited yet (editedElements means user edits exist)
         if (!editedElements) onElements?.(allConverted);
