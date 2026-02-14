@@ -48,6 +48,61 @@ function forceCleanStyle(elements: any[]): any[] {
   return elements.map((el: any) => ({ ...el, roughness: 0 }));
 }
 
+const PSEUDO_TYPES = new Set(["cameraUpdate", "delete", "restoreCheckpoint"]);
+const CONTAINER_SHAPES = new Set(["rectangle", "diamond", "ellipse"]);
+const HAS_BOUNDS = new Set(["rectangle", "diamond", "ellipse", "arrow", "text", "line"]);
+
+function elementBounds(el: any): { x: number; y: number; right: number; bottom: number } | null {
+  const w = el.width ?? 0;
+  const h = el.height ?? 0;
+  if (w <= 0 || h <= 0) return null;
+  return { x: el.x, y: el.y, right: el.x + w, bottom: el.y + h };
+}
+
+function isFullyInside(inner: { x: number; y: number; right: number; bottom: number }, outer: { x: number; y: number; right: number; bottom: number }): boolean {
+  return inner.x >= outer.x && inner.y >= outer.y && inner.right <= outer.right && inner.bottom <= outer.bottom;
+}
+
+/** Assign groupIds so nested shapes form Excalidraw groups — click parent to select and move all. */
+function assignGroupIdsForNestedShapes(elements: any[]): any[] {
+  const drawable = elements.filter((el: any) => !PSEUDO_TYPES.has(el.type));
+  const containers = drawable.filter((el: any) => CONTAINER_SHAPES.has(el.type));
+  const withBounds = drawable.filter((el: any) => HAS_BOUNDS.has(el.type));
+  if (containers.length < 1 || withBounds.length < 2) return elements;
+
+  const byArea = [...containers].sort((a, b) => (b.width * b.height) - (a.width * a.height));
+  const elById = new Map<string, any>();
+  for (const el of elements) elById.set(el.id, el);
+
+  const result = elements.map((el) => ({ ...el, groupIds: [...(el.groupIds ?? [])] }));
+  const resultById = new Map<string, { el: any; idx: number }>();
+  result.forEach((el, i) => resultById.set(el.id, { el, idx: i }));
+
+  for (const parent of byArea) {
+    const pb = elementBounds(parent);
+    if (!pb) continue;
+    const children = withBounds.filter((c: any) => {
+      if (c.id === parent.id) return false;
+      const cb = elementBounds(c);
+      return cb && isFullyInside(cb, pb);
+    });
+    if (children.length === 0) continue;
+
+    const groupId = crypto.randomUUID();
+    const toGroup = [parent, ...children];
+    for (const el of toGroup) {
+      const r = resultById.get(el.id);
+      if (!r) continue;
+      const idx = r.idx;
+      const existing = result[idx].groupIds ?? [];
+      if (existing.includes(groupId)) continue;
+      result[idx] = { ...result[idx], groupIds: [...existing, groupId] };
+    }
+  }
+
+  return result;
+}
+
 const LABELABLE_SHAPES = new Set(["rectangle", "diamond", "ellipse"]);
 /** Max pixels the text can be above the shape's top edge. */
 const MAX_GROUP_TITLE_GAP_ABOVE = 80;
@@ -516,8 +571,9 @@ function DiagramView({ toolInput, isFinal, displayMode, onElements, editedElemen
         // Convert new elements for fullscreen editor
         const convertedNew = convertRawElements(drawElements);
 
-        // Merge base (converted) + new converted
-        const allConverted = base ? [...base, ...convertedNew] : convertedNew;
+        // Merge base (converted) + new converted, then auto-group nested shapes
+        let allConverted = base ? [...base, ...convertedNew] : convertedNew;
+        allConverted = assignGroupIdsForNestedShapes(allConverted);
         captureInitialElements(allConverted);
         // Only set elements if user hasn't edited yet (editedElements means user edits exist)
         if (!editedElements) onElements?.(allConverted);
