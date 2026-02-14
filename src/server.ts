@@ -64,7 +64,7 @@ Thanks for calling read_me! Do NOT call it again in this conversation — you wi
 \`type\`, \`id\` (unique string), \`x\`, \`y\`, \`width\`, \`height\`
 
 ### Defaults (skip these)
-strokeColor="#1e1e1e", backgroundColor="transparent", fillStyle="solid", strokeWidth=2, roughness=1, opacity=100
+strokeColor="#1e1e1e", backgroundColor="transparent", fillStyle="solid", strokeWidth=2, roughness=0, opacity=100
 Canvas background is white.
 
 ### Element Types

@@ -1,13 +1,6 @@
 /* Load Excalidraw component CSS from CDN (avoids inlining ~200KB) */
 @import url("https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/prod/index.css");
 
-/* Load Excalidraw's hand-drawn font from CDN (Excalifont = v0.18 default) */
-@font-face {
-  font-family: "Excalifont";
-  src: url("https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/prod/fonts/Excalifont/Excalifont-Regular-a88b72a24fb54c9f94e3b5fdaa7481c9.woff2") format("woff2");
-  font-display: swap;
-}
-
 /* Preload Excalidraw UI fonts so they're cached before fullscreen mount.
    Without this, Excalidraw loads them on component init, triggering a font
    recalculation pass that corrupts text dimensions on first open. */

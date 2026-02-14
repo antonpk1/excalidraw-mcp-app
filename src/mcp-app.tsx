@@ -43,8 +43,14 @@ interface ViewportRect {
   height: number;
 }
 
+/** Force cleaner style: roughness 0 (architect) on all drawable elements. */
+function forceCleanStyle(elements: any[]): any[] {
+  return elements.map((el: any) => ({ ...el, roughness: 0 }));
+}
+
 /** Convert raw shorthand elements → Excalidraw format (labels → bound text, font fix).
- *  Preserves pseudo-elements like cameraUpdate (not valid Excalidraw types). */
+ *  Preserves pseudo-elements like cameraUpdate (not valid Excalidraw types).
+ *  Uses Helvetica (never hand-drawn) and roughness 0 (cleaner). */
 function convertRawElements(els: any[]): any[] {
   const pseudoTypes = new Set(["cameraUpdate", "delete", "restoreCheckpoint"]);
   const pseudos = els.filter((el: any) => pseudoTypes.has(el.type));
@@ -53,7 +59,10 @@ function convertRawElements(els: any[]): any[] {
     el.label ? { ...el, label: { textAlign: "center", verticalAlign: "middle", ...el.label } } : el
   );
   const converted = convertToExcalidrawElements(withDefaults, { regenerateIds: false })
-    .map((el: any) => el.type === "text" ? { ...el, fontFamily: (FONT_FAMILY as any).Excalifont ?? 1 } : el);
+    .map((el: any) => {
+      const base = el.type === "text" ? { ...el, fontFamily: (FONT_FAMILY as any).Helvetica } : el;
+      return { ...base, roughness: 0 };
+    });
   return [...converted, ...pseudos];
 }
 
@@ -271,11 +280,11 @@ function DiagramView({ toolInput, isFinal, displayMode, onElements, editedElemen
     return () => observer.disconnect();
   }, [displayMode]);
 
-  // Font preloading — ensure Virgil is loaded before first export
+  // Font preloading — ensure Helvetica (clean, non-hand-drawn) is loaded before first export
   const fontsReady = useRef<Promise<void> | null>(null);
   const ensureFontsLoaded = useCallback(() => {
     if (!fontsReady.current) {
-      fontsReady.current = document.fonts.load('20px Excalifont').then(() => {});
+      fontsReady.current = document.fonts.load('20px Helvetica').then(() => {});
     }
     return fontsReady.current;
   }, []);
@@ -327,7 +336,7 @@ function DiagramView({ toolInput, isFinal, displayMode, onElements, editedElemen
   const renderSvgPreview = useCallback(async (els: any[], viewport: ViewportRect | null, baseElements?: any[]) => {
     if ((els.length === 0 && !baseElements?.length) || !svgRef.current) return;
     try {
-      // Wait for Virgil font to load before computing text metrics
+      // Wait for Helvetica font to load before computing text metrics
       await ensureFontsLoaded();
 
       // Convert new elements (raw → Excalidraw format)
@@ -338,8 +347,9 @@ function DiagramView({ toolInput, isFinal, displayMode, onElements, editedElemen
       // Update scene bounds from all elements
       sceneBoundsRef.current = computeSceneBounds(excalidrawEls);
 
+      const cleanEls = forceCleanStyle(excalidrawEls);
       const svg = await exportToSvg({
-        elements: excalidrawEls as any,
+        elements: cleanEls as any,
         appState: { viewBackgroundColor: "transparent", exportBackground: false } as any,
         files: null,
         exportPadding: EXPORT_PADDING,
@@ -515,8 +525,9 @@ function DiagramView({ toolInput, isFinal, displayMode, onElements, editedElemen
     (async () => {
       try {
         await ensureFontsLoaded();
+        const cleanEls = forceCleanStyle(editedElements);
         const svg = await exportToSvg({
-          elements: editedElements as any,
+          elements: cleanEls as any,
           appState: { viewBackgroundColor: "transparent", exportBackground: false } as any,
           files: null,
           exportPadding: EXPORT_PADDING,
@@ -602,13 +613,11 @@ function ExcalidrawApp() {
     return () => document.removeEventListener("keydown", handler);
   }, [displayMode, toggleFullscreen]);
 
-  // Preload ALL Excalidraw fonts on first mount (inline mode) so they're
-  // cached before fullscreen. Without this, Excalidraw's component init
-  // downloads Assistant fonts, triggering a font recalc that corrupts
-  // text dimensions measured with not-yet-loaded Excalifont.
+  // Preload fonts on first mount so they're cached before fullscreen.
+  // Helvetica (clean) for diagram text; Assistant for Excalidraw UI.
   useEffect(() => {
     Promise.all([
-      document.fonts.load('20px Excalifont'),
+      document.fonts.load('20px Helvetica'),
       document.fonts.load('400 16px Assistant'),
       document.fonts.load('500 16px Assistant'),
       document.fonts.load('700 16px Assistant'),
@@ -649,7 +658,7 @@ function ExcalidrawApp() {
     const api = excalidrawApi;
 
     const settle = async () => {
-      try { await document.fonts.load('20px Excalifont'); } catch {}
+      try { await document.fonts.load('20px Helvetica'); } catch {}
       await document.fonts.ready;
 
       const sceneElements = api.getSceneElements();
