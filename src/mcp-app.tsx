@@ -48,6 +48,68 @@ function forceCleanStyle(elements: any[]): any[] {
   return elements.map((el: any) => ({ ...el, roughness: 0 }));
 }
 
+const LABELABLE_SHAPES = new Set(["rectangle", "diamond", "ellipse"]);
+/** Max pixels the text can be above the shape's top edge. */
+const MAX_GROUP_TITLE_GAP_ABOVE = 80;
+/** Max pixels the text bottom can extend below the shape's top (overlap or inside top of shape). */
+const MAX_GROUP_TITLE_OVERLAP_BELOW = 60;
+
+/** Merge standalone "group title" text into the label of the shape below or at top.
+ *  Avoids floating text that gets truncated; always use shape labels for group/section titles. */
+function mergeGroupTitleTextIntoShapes(elements: any[]): any[] {
+  const shapes = elements.filter((el: any) => LABELABLE_SHAPES.has(el.type));
+  const texts = elements.filter((el: any) => el.type === "text");
+  const mergedInto = new Map<string, string>(); // shapeId -> textId
+  const textIdsToRemove = new Set<string>();
+
+  for (const T of texts) {
+    const tH = T.height ?? 20;
+    const tW = T.width ?? Math.max(20, (String(T.text ?? "").length * (T.fontSize ?? 20) * 0.5));
+    const tBottom = T.y + tH;
+    let best: { shape: any; gap: number; area: number } | null = null;
+
+    for (const S of shapes) {
+      if (S.label) continue; // shape already has a label (e.g. inner box)
+      const gap = S.y - tBottom; // positive = text above shape top, negative = text overlaps into shape
+      if (gap > MAX_GROUP_TITLE_GAP_ABOVE || gap < -MAX_GROUP_TITLE_OVERLAP_BELOW) continue;
+      const tRight = T.x + tW;
+      if (tRight < S.x || T.x > S.x + S.width) continue;
+      const area = S.width * S.height;
+      // Prefer largest shape (zone/group container) then smallest gap (closest to top)
+      if (!best || area > best.area || (area === best.area && gap < best.gap)) {
+        best = { shape: S, gap, area };
+      }
+    }
+    if (best) {
+      mergedInto.set(best.shape.id, T.id);
+      textIdsToRemove.add(T.id);
+    }
+  }
+
+  const shapeLabels = new Map<string, any>();
+  for (const [shapeId, textId] of mergedInto) {
+    const text = texts.find((t: any) => t.id === textId);
+    if (text) {
+      shapeLabels.set(shapeId, {
+        text: text.text,
+        fontSize: text.fontSize ?? 20,
+        textAlign: "center",
+        verticalAlign: "top", // group/section title at top of shape, not middle
+      });
+    }
+  }
+
+  return elements
+    .filter((el: any) => !textIdsToRemove.has(el.id))
+    .map((el: any) => {
+      const label = shapeLabels.get(el.id);
+      return label ? { ...el, label } : el;
+    });
+}
+
+/** Min area for a shape to be treated as a group container (label at top). Smaller = inner box (label centered). */
+const GROUP_LABEL_AREA_THRESHOLD = 25000;
+
 /** Convert raw shorthand elements → Excalidraw format (labels → bound text, font fix).
  *  Preserves pseudo-elements like cameraUpdate (not valid Excalidraw types).
  *  Uses Helvetica (never hand-drawn) and roughness 0 (cleaner). */
@@ -55,9 +117,12 @@ function convertRawElements(els: any[]): any[] {
   const pseudoTypes = new Set(["cameraUpdate", "delete", "restoreCheckpoint"]);
   const pseudos = els.filter((el: any) => pseudoTypes.has(el.type));
   const real = els.filter((el: any) => !pseudoTypes.has(el.type));
-  const withDefaults = real.map((el: any) =>
-    el.label ? { ...el, label: { textAlign: "center", verticalAlign: "middle", ...el.label } } : el
-  );
+  const withDefaults = real.map((el: any) => {
+    if (!el.label) return el;
+    const area = (el.width ?? 0) * (el.height ?? 0);
+    const verticalAlign = LABELABLE_SHAPES.has(el.type) && area >= GROUP_LABEL_AREA_THRESHOLD ? "top" : "middle";
+    return { ...el, label: { textAlign: "center", ...el.label, verticalAlign } };
+  });
   const converted = convertToExcalidrawElements(withDefaults, { regenerateIds: false })
     .map((el: any) => {
       const base = el.type === "text" ? { ...el, fontFamily: (FONT_FAMILY as any).Helvetica } : el;
@@ -425,6 +490,7 @@ function DiagramView({ toolInput, isFinal, displayMode, onElements, editedElemen
       // Final input — parse complete JSON, render ALL elements
       const parsed = parsePartialElements(str);
       let { viewport, drawElements, restoreId, deleteIds } = extractViewportAndElements(parsed);
+      drawElements = mergeGroupTitleTextIntoShapes(drawElements);
 
       // Load checkpoint base if restoring (async — from server)
       let base: any[] | undefined;
@@ -476,6 +542,7 @@ function DiagramView({ toolInput, isFinal, displayMode, onElements, editedElemen
 
     const safe = excludeIncompleteLastItem(parsed);
     let { viewport, drawElements } = extractViewportAndElements(safe);
+    drawElements = mergeGroupTitleTextIntoShapes(drawElements);
 
     const doStream = async () => {
       // Load checkpoint base (once per restoreId) — from server via callServerTool

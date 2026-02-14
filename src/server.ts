@@ -77,19 +77,18 @@ Canvas background is white.
 
 **Diamond**: \`{ "type": "diamond", "id": "d1", "x": 100, "y": 100, "width": 150, "height": 150 }\`
 
-**Labeled shape (PREFERRED)**: Add \`label\` to any shape for auto-centered text. No separate text element needed.
+**Labeled shape (REQUIRED for all shape text)** — ALWAYS use \`label\` on shapes. NEVER use standalone text for group/section titles or labels inside/on shapes.
 \`{ "type": "rectangle", "id": "r1", "x": 100, "y": 100, "width": 200, "height": 80, "label": { "text": "Hello", "fontSize": 20 } }\`
 - Works on rectangle, ellipse, diamond
-- Text auto-centers and container auto-resizes to fit
-- Saves tokens vs separate text elements
+- Text auto-centers and container auto-resizes to fit; avoids truncation bugs from floating text
+- For group containers: put the group title in the container's \`label\`, e.g. \`{ "type": "rectangle", "id": "group1", "x": 50, "y": 50, "width": 400, "height": 300, "label": { "text": "Smart Contracts & Protocol", "fontSize": 20 } }\`
+- Inner boxes: also use \`label\` on each shape (e.g. "contract-audits", "contracts-v2")
 
 **Labeled arrow**: \`"label": { "text": "connects" }\` on an arrow element.
 
-**Standalone text** (titles, annotations only):
+**Standalone text** — use ONLY for annotations that are not titles or labels of a shape (e.g. a note outside any box). Do NOT use for group titles or labels on/in shapes; those MUST be shape \`label\` to avoid truncation.
 \`{ "type": "text", "id": "t1", "x": 150, "y": 138, "text": "Hello", "fontSize": 20 }\`
-- x is the LEFT edge of the text. To center text at position cx: set x = cx - estimatedWidth/2
-- estimatedWidth ≈ text.length × fontSize × 0.5
-- Do NOT rely on textAlign or width for positioning — they only affect multi-line wrapping
+- x is the LEFT edge of the text. estimatedWidth ≈ text.length × fontSize × 0.5
 
 **Arrow**: \`{ "type": "arrow", "id": "a1", "x": 300, "y": 150, "width": 200, "height": 0, "points": [[0,0],[200,0]], "endArrowhead": "arrow" }\`
 - points: [dx, dy] offsets from element x,y
@@ -115,9 +114,9 @@ fixedPoint: top=[0.5,0], bottom=[0.5,1], left=[0,0.5], right=[1,0.5]
 
 ### Drawing Order (CRITICAL for streaming)
 - Array order = z-order (first = back, last = front)
-- **Emit progressively**: background → shape → its label → its arrows → next shape
-- BAD: all rectangles → all texts → all arrows
-- GOOD: bg_shape → shape1 → text1 → arrow1 → shape2 → text2 → ...
+- **Emit progressively**: each shape WITH its \`label\` (no separate text element for that shape's title/label) → arrows → next shape
+- BAD: all rectangles → all texts → all arrows; or group title as floating text
+- GOOD: bg_shape (with label if it has a title) → shape1 (with label) → arrow1 → shape2 (with label) → ...
 
 ### Example: Two connected labeled boxes
 \`\`\`json
