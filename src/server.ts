@@ -60,8 +60,8 @@ Thanks for calling read_me! Do NOT call it again in this conversation — you wi
 
 ## Excalidraw Elements
 
-### Required Fields (all elements)
-\`type\`, \`id\` (unique string), \`x\`, \`y\`, \`width\`, \`height\`
+### Required Fields
+\`type\`, \`id\` (unique string), \`x\`, \`y\`, \`width\`, \`height\` — except bound arrows (which only need \`type\`, \`id\`, \`start\`, \`end\`)
 
 ### Defaults (skip these)
 strokeColor="#1e1e1e", backgroundColor="transparent", fillStyle="solid", strokeWidth=2, roughness=1, opacity=100
@@ -91,13 +91,20 @@ Canvas background is white.
 - estimatedWidth ≈ text.length × fontSize × 0.5
 - Do NOT rely on textAlign or width for positioning — they only affect multi-line wrapping
 
-**Arrow**: \`{ "type": "arrow", "id": "a1", "x": 300, "y": 150, "width": 200, "height": 0, "points": [[0,0],[200,0]], "endArrowhead": "arrow" }\`
-- points: [dx, dy] offsets from element x,y
+**Arrow (bound — PREFERRED)**: \`{ "type": "arrow", "id": "a1", "start": { "id": "r1" }, "end": { "id": "r2" }, "endArrowhead": "arrow" }\`
+- Positions computed automatically — no x, y, width, height, or points needed
+- Both source and target shapes MUST appear BEFORE the arrow in the array
+- Add \`"label": { "text": "connects" }\` for labeled arrows
 - endArrowhead: null | "arrow" | "bar" | "dot" | "triangle"
 
-### Arrow Bindings
-Arrow: \`"startBinding": { "elementId": "r1", "fixedPoint": [1, 0.5] }\`
-fixedPoint: top=[0.5,0], bottom=[0.5,1], left=[0,0.5], right=[1,0.5]
+**Arrow (unbound — for decorative lines, annotations)**: \`{ "type": "arrow", "id": "a1", "x": 300, "y": 150, "width": 200, "height": 0, "points": [[0,0],[200,0]], "endArrowhead": "arrow" }\`
+- points: [dx, dy] offsets from element x,y
+
+### Arrow Bindings (auto-positioned)
+Use \`start\` and \`end\` to bind arrows to shapes by id:
+\`{ "type": "arrow", "id": "a1", "start": { "id": "r1" }, "end": { "id": "r2" }, "endArrowhead": "arrow" }\`
+Both source and target shapes MUST appear in the array BEFORE the arrow.
+For one-sided binding, omit \`start\` or \`end\` and use x/y/points for the unbound end.
 
 **cameraUpdate** (pseudo-element — controls the viewport, not drawn):
 \`{ "type": "cameraUpdate", "width": 800, "height": 600, "x": 0, "y": 0 }\`
@@ -115,9 +122,10 @@ fixedPoint: top=[0.5,0], bottom=[0.5,1], left=[0,0.5], right=[1,0.5]
 
 ### Drawing Order (CRITICAL for streaming)
 - Array order = z-order (first = back, last = front)
-- **Emit progressively**: background → shape → its label → its arrows → next shape
-- BAD: all rectangles → all texts → all arrows
-- GOOD: bg_shape → shape1 → text1 → arrow1 → shape2 → text2 → ...
+- **Bound arrows**: emit BOTH source and target shapes BEFORE the arrow connecting them
+- For linear flows A->B->C: shape A, shape B, arrow(A->B), shape C, arrow(B->C)
+- For hub patterns: emit centre shape, then each spoke shape + arrow pair
+- Labels on shapes use \`label\` property (auto-centred), so no separate text elements needed
 
 ### Example: Two connected labeled boxes
 \`\`\`json
@@ -125,9 +133,11 @@ fixedPoint: top=[0.5,0], bottom=[0.5,1], left=[0,0.5], right=[1,0.5]
   { "type": "cameraUpdate", "width": 800, "height": 600, "x": 50, "y": 50 },
   { "type": "rectangle", "id": "b1", "x": 100, "y": 100, "width": 200, "height": 100, "roundness": { "type": 3 }, "backgroundColor": "#a5d8ff", "fillStyle": "solid", "label": { "text": "Start", "fontSize": 20 } },
   { "type": "rectangle", "id": "b2", "x": 450, "y": 100, "width": 200, "height": 100, "roundness": { "type": 3 }, "backgroundColor": "#b2f2bb", "fillStyle": "solid", "label": { "text": "End", "fontSize": 20 } },
-  { "type": "arrow", "id": "a1", "x": 300, "y": 150, "width": 150, "height": 0, "points": [[0,0],[150,0]], "endArrowhead": "arrow", "startBinding": { "elementId": "b1", "fixedPoint": [1, 0.5] }, "endBinding": { "elementId": "b2", "fixedPoint": [0, 0.5] } }
+  { "type": "arrow", "id": "a1", "start": { "id": "b1" }, "end": { "id": "b2" }, "endArrowhead": "arrow" }
 ]
 \`\`\`
+
+Note: The larger examples below use manual arrow positioning (x/y/points) for precise artistic layouts. For most diagrams, prefer bound arrows with \`start\`/\`end\` — they're simpler and always connect correctly.
 
 ### Camera & Sizing (CRITICAL for readability)
 

@@ -23,18 +23,16 @@ Takes `elements` — a JSON string of standard Excalidraw elements. The widget p
 
 ## Key Design Decisions
 
-### Standard Excalidraw JSON — no extensions
-The input is standard Excalidraw element JSON. No `label` on containers, no `start`/`end` on arrows. These are Excalidraw's internal "skeleton" API (`convertToExcalidrawElements`) — not the standard format.
+### Skeleton API via convertToExcalidrawElements
+Input uses Excalidraw's skeleton format, processed by `convertToExcalidrawElements` on every render.
+Supported skeleton shortcuts:
+- `label` on shapes (auto-centred text, auto-resize container)
+- `start`/`end` on arrows (binding metadata + position resolution by target element ID)
+- Standalone text and manually-positioned arrows with x/y/points still work
 
-**Why:** Standard format means any `.excalidraw` file's elements array works as input.
+**Important:** `convertToExcalidrawElements` creates binding metadata but does NOT compute arrow coordinates. `resolveArrowPositions` (in `mcp-app.tsx`) post-processes the output to compute x/y/points from bound shape edges. Without this step, bound arrows render at (0,0).
 
-**Trade-off:** Labels require separate text elements with manually computed centered coordinates. The cheat sheet teaches the formula: `x = shape.x + (shape.width - text.width) / 2`.
-
-### No `convertToExcalidrawElements`
-We tried Excalidraw's skeleton API. Problems:
-1. Needs font metrics at conversion time (canvas `measureText`)
-2. Non-standard format
-3. Added complexity for marginal benefit
+**Trade-off:** Elements must be ordered so target shapes appear before arrows that reference them.
 
 ### SVG-only rendering (no Excalidraw React canvas)
 The widget uses `exportToSvg` for ALL rendering — no `<Excalidraw>` React component.
