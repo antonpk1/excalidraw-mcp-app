@@ -17,7 +17,7 @@ src/global.css   → Animations (stroke draw-on, fade-in) + auto-resize
 Returns a cheat sheet with element format, color palettes, coordinate tips, and examples. The model should call this before `create_view`.
 
 ### `create_view` (UI tool)
-Takes `elements` — a JSON string of standard Excalidraw elements. The widget parses partial JSON during streaming and renders via `exportToSvg` + morphdom diffing. No Excalidraw React canvas component — pure SVG rendering.
+Takes `elements` — a JSON string of standard Excalidraw elements — and `plan` (required): 2-5 sentences or bullet points describing the diagram structure and narrative. The plan is stored in the checkpoint and used when creating files in Obsidian. The widget parses partial JSON during streaming and renders via `exportToSvg` + morphdom diffing. No Excalidraw React canvas component — pure SVG rendering.
 
 **Screenshot as model context:** After final render, the SVG is captured as a 512px-max PNG and sent via `app.updateModelContext()` so the model can see the diagram and iterate on user feedback.
 
@@ -117,7 +117,7 @@ npm run dev
 
 ## Create in Obsidian
 
-The MCP exposes a **create in Obsidian** operation that only the **app** can call (not the agent). The widget shows a **Create in Obsidian** button under the canvas; when the user clicks it, a modal asks for a **diagram title** (description of what the diagram is about). The file is saved as **{title}.md** in the vault, using the **obsidian-excalidraw plugin** markdown format: frontmatter (`excalidraw-plugin: parsed`, `tags: [excalidraw]`), Excalidraw Data section, Text Elements list, and a Drawing block with the full Excalidraw JSON in a fenced code block.
+The MCP exposes a **create in Obsidian** operation that only the **app** can call (not the agent). The widget shows a **Create in Obsidian** button under the canvas; when the user clicks it, a modal asks for a **diagram title** (description of what the diagram is about). When a plan was provided with `create_view`, the server creates two files: **{title}.plan.md** (the agent's plan) and **{title}.md** (the Excalidraw diagram). The diagram file includes at the start: *This diagram was auto-generated via Excalidraw MCP. Plan: [[{title}.plan]]* — so you can always trace back to the plan that generated it. The diagram file uses the **obsidian-excalidraw plugin** markdown format: frontmatter (`excalidraw-plugin: parsed`, `tags: [excalidraw]`), Excalidraw Data section, Text Elements list, and a Drawing block with the full Excalidraw JSON in a fenced code block.
 
 The server tries, in order:
 

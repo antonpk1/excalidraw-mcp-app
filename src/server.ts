@@ -24,7 +24,7 @@ function sanitizeFilenamePart(name: string): string {
 }
 
 /** Build Obsidian excalidraw-plugin markdown (frontmatter, Text Elements, Drawing JSON block). */
-function buildObsidianExcalidrawMarkdown(json: string): string {
+function buildObsidianExcalidrawMarkdown(json: string, planLink?: string): string {
   let elements: any[] = [];
   try {
     const doc = JSON.parse(json) as { elements?: any[] };
@@ -43,12 +43,13 @@ function buildObsidianExcalidrawMarkdown(json: string): string {
     textLines.length > 0
       ? "\n## Text Elements\n" + textLines.join("\n") + "\n"
       : "\n";
+  const introLine = planLink ? `*This diagram was auto-generated via Excalidraw MCP. Plan: ${planLink}*\n\n` : "";
   return `---
 excalidraw-plugin: parsed
 tags: [excalidraw]
 
 ---
-==⚠  Switch to EXCALIDRAW VIEW in the MORE OPTIONS menu of this document. ⚠== You can decompress Drawing data with the command palette: 'Decompress current Excalidraw file'. For more info check in plugin settings under 'Saving'
+${introLine}==⚠  Switch to EXCALIDRAW VIEW in the MORE OPTIONS menu of this document. ⚠== You can decompress Drawing data with the command palette: 'Decompress current Excalidraw file'. For more info check in plugin settings under 'Saving'
 
 
 # Excalidraw Data
@@ -58,6 +59,18 @@ ${textSection}%%
 ${json}
 \`\`\`
 %%`;
+}
+
+/** Build plan markdown file content. */
+function buildPlanMarkdown(plan: string): string {
+  return `---
+tags: [excalidraw, plan]
+---
+
+# Diagram Plan
+
+${plan}
+`;
 }
 
 // Works both from source (src/server.ts) and compiled (dist/server.js)
@@ -71,6 +84,13 @@ const DIST_DIR = import.meta.filename.endsWith(".ts")
 const RECALL_CHEAT_SHEET = `# Excalidraw Element Format
 
 Thanks for calling read_me! Do NOT call it again in this conversation — you will not see anything new. Now use create_view to draw.
+
+## REQUIRED: plan parameter
+
+create_view requires a \`plan\` parameter. Provide 2-5 sentences or bullet points describing:
+- Diagram structure and what each part represents
+- Narrative or camera flow
+This plan is saved with the diagram and becomes a \`.plan.md\` file in Obsidian when the user saves — for traceability.
 
 ## Color Palette (use consistently across all tools)
 
@@ -479,11 +499,14 @@ Call read_me first to learn the element format.`,
         elements: z.string().describe(
           "JSON array string of Excalidraw elements. Must be valid JSON — no comments, no trailing commas. Keep compact. Call read_me first for format reference."
         ),
+        plan: z.string().min(1).describe(
+          "Required: 2-5 sentences or bullet points describing the diagram structure, what each part represents, and the narrative/camera flow. This plan is saved with the diagram and becomes a .plan.md file in Obsidian for traceability."
+        ),
       }),
       annotations: { readOnlyHint: true },
       _meta: { ui: { resourceUri } },
     },
-    async ({ elements }): Promise<CallToolResult> => {
+    async ({ elements, plan }): Promise<CallToolResult> => {
       if (elements.length > MAX_INPUT_BYTES) {
         return {
           content: [{ type: "text", text: `Elements input exceeds ${MAX_INPUT_BYTES} byte limit. Reduce the number of elements or use checkpoints to build incrementally.` }],
@@ -504,6 +527,7 @@ Call read_me first to learn the element format.`,
       const restoreEl = parsed.find((el: any) => el.type === "restoreCheckpoint");
       let resolvedElements: any[];
 
+      let planToSave = plan;
       if (restoreEl?.id) {
         const base = await store.load(restoreEl.id);
         if (!base) {
@@ -512,6 +536,7 @@ Call read_me first to learn the element format.`,
             isError: true,
           };
         }
+        planToSave = plan ?? base.plan ?? "";
 
         const deleteIds = new Set<string>();
         for (const el of parsed) {
@@ -543,7 +568,7 @@ Call read_me first to learn the element format.`,
         : "";
 
       const checkpointId = crypto.randomUUID().replace(/-/g, "").slice(0, 18);
-      await store.save(checkpointId, { elements: resolvedElements });
+      await store.save(checkpointId, { elements: resolvedElements, plan: planToSave });
       return {
         content: [{ type: "text", text: `Diagram displayed! Checkpoint id: "${checkpointId}".
 If user asks to create a new diagram - simply create a new one from scratch.
@@ -668,7 +693,12 @@ However, if the user wants to edit something on this diagram "${checkpointId}", 
         };
       }
       try {
-        await store.save(id, JSON.parse(data));
+        const parsed = JSON.parse(data) as { elements?: any[] };
+        const existing = await store.load(id);
+        const merged = existing
+          ? { ...existing, elements: parsed.elements ?? existing.elements }
+          : { elements: parsed.elements ?? [], plan: undefined as string | undefined };
+        await store.save(id, merged);
         return { content: [{ type: "text", text: "ok" }] };
       } catch (err) {
         return { content: [{ type: "text", text: `save failed: ${(err as Error).message}` }], isError: true };
@@ -687,10 +717,11 @@ However, if the user wants to edit something on this diagram "${checkpointId}", 
       inputSchema: {
         json: z.string().describe("Full Excalidraw document JSON (type, version, elements, appState, files)."),
         title: z.string().optional().describe("Description/title for the diagram; used as filename base. Default: diagram. Resulting file: {title}.md"),
+        checkpointId: z.string().optional().describe("Checkpoint ID to load plan from; when provided, creates {title}.plan.md and adds a link in the Excalidraw file."),
       },
       _meta: { ui: { visibility: ["app"] } },
     },
-    async ({ json, title: titleArg }): Promise<CallToolResult> => {
+    async ({ json, title: titleArg, checkpointId }): Promise<CallToolResult> => {
       if (json.length > MAX_INPUT_BYTES) {
         return {
           content: [{ type: "text", text: `Diagram data exceeds ${MAX_INPUT_BYTES} byte limit.` }],
@@ -699,17 +730,29 @@ However, if the user wants to edit something on this diagram "${checkpointId}", 
       }
       const baseName = sanitizeFilenamePart(titleArg?.trim() || "diagram");
       const filename = `${baseName}.md`;
-      const markdown = buildObsidianExcalidrawMarkdown(json);
+      const planFilename = `${baseName}.plan.md`;
+      let plan: string | undefined;
+      if (checkpointId) {
+        const checkpoint = await store.load(checkpointId);
+        plan = checkpoint?.plan;
+      }
+      const planLink = plan ? `[[${baseName}.plan]]` : undefined;
+      const markdown = buildObsidianExcalidrawMarkdown(json, planLink);
 
       const vaultPath = process.env.OBSIDIAN_VAULT_PATH || process.env.EXCALIDRAW_MCP_OBSIDIAN_VAULT;
 
       if (vaultPath) {
         try {
-          const fullPath = path.join(vaultPath, filename);
-          const dir = path.dirname(fullPath);
+          const dir = path.dirname(path.join(vaultPath, filename));
           await fs.mkdir(dir, { recursive: true });
+          if (plan) {
+            const planPath = path.join(vaultPath, planFilename);
+            await fs.writeFile(planPath, buildPlanMarkdown(plan), "utf-8");
+          }
+          const fullPath = path.join(vaultPath, filename);
           await fs.writeFile(fullPath, markdown, "utf-8");
-          return { content: [{ type: "text", text: `Created ${filename} in vault at ${fullPath}.` }] };
+          const created = plan ? `${planFilename} and ${filename}` : filename;
+          return { content: [{ type: "text", text: `Created ${created} in vault at ${vaultPath}.` }] };
         } catch (err) {
           return {
             content: [{ type: "text", text: `Could not write to vault: ${(err as Error).message}. Check OBSIDIAN_VAULT_PATH.` }],
@@ -725,6 +768,25 @@ However, if the user wants to edit something on this diagram "${checkpointId}", 
         (platform() === "darwin" && existsSync(defaultMacPath) ? defaultMacPath : "obsidian");
 
       try {
+        if (plan) {
+          const planResult = await new Promise<{ stdout: string; stderr: string; code: number | null }>((resolve, reject) => {
+            const proc = spawn(cliPath, ["create", planFilename, "--content", buildPlanMarkdown(plan)], {
+              stdio: ["ignore", "pipe", "pipe"],
+            });
+            let stdout = "";
+            let stderr = "";
+            proc.stdout?.on("data", (d) => { stdout += String(d); });
+            proc.stderr?.on("data", (d) => { stderr += String(d); });
+            proc.on("error", (err) => reject(err));
+            proc.on("close", (code) => resolve({ stdout, stderr, code: code ?? null }));
+          });
+          if (planResult.code !== 0) {
+            return {
+              content: [{ type: "text", text: `Obsidian CLI failed creating plan: ${planResult.stderr || planResult.stdout || "non-zero exit"}` }],
+              isError: true,
+            };
+          }
+        }
         const result = await new Promise<{ stdout: string; stderr: string; code: number | null }>((resolve, reject) => {
           const proc = spawn(cliPath, ["create", filename, "--content", markdown], {
             stdio: ["ignore", "pipe", "pipe"],
@@ -742,7 +804,8 @@ However, if the user wants to edit something on this diagram "${checkpointId}", 
             isError: true,
           };
         }
-        return { content: [{ type: "text", text: `Created ${filename} in Obsidian vault.` }] };
+        const created = plan ? `${planFilename} and ${filename}` : filename;
+        return { content: [{ type: "text", text: `Created ${created} in Obsidian vault.` }] };
       } catch (err) {
         const msg = (err as NodeJS.ErrnoException).code === "ENOENT"
           ? "Obsidian CLI not found. Set OBSIDIAN_CLI_PATH to the full path of the obsidian binary (e.g. from \"which obsidian\"), or set OBSIDIAN_VAULT_PATH to your vault folder to save directly."

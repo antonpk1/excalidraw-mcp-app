@@ -457,10 +457,12 @@ function CreateInObsidianButton({
   app,
   elements,
   excalidrawApi,
+  checkpointIdRef,
 }: {
   app: App;
   elements: any[];
   excalidrawApi: any;
+  checkpointIdRef: React.MutableRefObject<string | null>;
 }) {
   const [state, setState] = useState<"idle" | "confirm" | "creating" | "success" | "error">("idle");
   const [titleDraft, setTitleDraft] = useState("diagram");
@@ -485,9 +487,15 @@ function CreateInObsidianButton({
       } else {
         json = buildExcalidrawDocumentJson(elements);
       }
+      const args: { json: string; title: string; checkpointId?: string } = {
+        json,
+        title: title.trim() || "diagram",
+      };
+      const cpId = checkpointIdRef.current;
+      if (cpId) args.checkpointId = cpId;
       const result = await app.callServerTool({
         name: "create_in_obsidian",
-        arguments: { json, title: title.trim() || "diagram" },
+        arguments: args,
       });
       if (result.isError) {
         const text = (result.content[0] as any)?.text ?? "Unknown error";
@@ -501,7 +509,7 @@ function CreateInObsidianButton({
       setErrorMsg((err as Error).message);
       setState("error");
     }
-  }, [app, elements, excalidrawApi]);
+  }, [app, elements, excalidrawApi, checkpointIdRef]);
 
   const label =
     state === "creating" ? "Creating…" :
@@ -1226,7 +1234,7 @@ function ExcalidrawApp() {
       {/* Footer: Create in Obsidian — visible when there is a diagram */}
       {inputIsFinal && elements.length > 0 && app && (
         <div className="canvas-footer">
-          <CreateInObsidianButton app={app} elements={elements} excalidrawApi={excalidrawApi} />
+          <CreateInObsidianButton app={app} elements={elements} excalidrawApi={excalidrawApi} checkpointIdRef={checkpointIdRef} />
         </div>
       )}
     </main>
