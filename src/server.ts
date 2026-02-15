@@ -1,15 +1,64 @@
 import { registerAppResource, registerAppTool, RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult, ReadResourceResult } from "@modelcontextprotocol/sdk/types.js";
+import { spawn } from "node:child_process";
 import crypto from "node:crypto";
+import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { platform } from "node:os";
 import { deflateSync } from "node:zlib";
 import { z } from "zod/v4";
 import type { CheckpointStore } from "./checkpoint-store.js";
 
 /** Maximum allowed size for element/data input strings (5 MB). */
 const MAX_INPUT_BYTES = 5 * 1024 * 1024;
+
+/** Sanitize a string for use as filename (no path, no unsafe chars). */
+function sanitizeFilenamePart(name: string): string {
+  return name
+    .replace(/[/\\:*?"<>|]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 100) || "diagram";
+}
+
+/** Build Obsidian excalidraw-plugin markdown (frontmatter, Text Elements, Drawing JSON block). */
+function buildObsidianExcalidrawMarkdown(json: string): string {
+  let elements: any[] = [];
+  try {
+    const doc = JSON.parse(json) as { elements?: any[] };
+    elements = Array.isArray(doc.elements) ? doc.elements : [];
+  } catch {
+    // keep elements empty
+  }
+  const textLines: string[] = [];
+  for (const el of elements) {
+    if (el && el.type === "text" && el.id && !el.isDeleted) {
+      const text = (el.text ?? el.rawText ?? "").replace(/\n/g, " ");
+      textLines.push(`${text} ^${el.id}`);
+    }
+  }
+  const textSection =
+    textLines.length > 0
+      ? "\n## Text Elements\n" + textLines.join("\n") + "\n"
+      : "\n";
+  return `---
+excalidraw-plugin: parsed
+tags: [excalidraw]
+
+---
+==⚠  Switch to EXCALIDRAW VIEW in the MORE OPTIONS menu of this document. ⚠== You can decompress Drawing data with the command palette: 'Decompress current Excalidraw file'. For more info check in plugin settings under 'Saving'
+
+
+# Excalidraw Data
+${textSection}%%
+## Drawing
+\`\`\`json
+${json}
+\`\`\`
+%%`;
+}
 
 // Works both from source (src/server.ts) and compiled (dist/server.js)
 const DIST_DIR = import.meta.filename.endsWith(".ts")
@@ -628,7 +677,83 @@ However, if the user wants to edit something on this diagram "${checkpointId}", 
   );
 
   // ============================================================
-  // Tool 5: read_checkpoint (private — widget only)
+  // Tool 5: create_in_obsidian (private — widget only)
+  // Creates a .excalidraw.md file in Obsidian vault (obsidian-excalidraw plugin format).
+  // ============================================================
+  registerAppTool(server,
+    "create_in_obsidian",
+    {
+      description: "Create the current diagram as a .md file in the user's Obsidian vault (obsidian-excalidraw plugin format).",
+      inputSchema: {
+        json: z.string().describe("Full Excalidraw document JSON (type, version, elements, appState, files)."),
+        title: z.string().optional().describe("Description/title for the diagram; used as filename base. Default: diagram. Resulting file: {title}.md"),
+      },
+      _meta: { ui: { visibility: ["app"] } },
+    },
+    async ({ json, title: titleArg }): Promise<CallToolResult> => {
+      if (json.length > MAX_INPUT_BYTES) {
+        return {
+          content: [{ type: "text", text: `Diagram data exceeds ${MAX_INPUT_BYTES} byte limit.` }],
+          isError: true,
+        };
+      }
+      const baseName = sanitizeFilenamePart(titleArg?.trim() || "diagram");
+      const filename = `${baseName}.md`;
+      const markdown = buildObsidianExcalidrawMarkdown(json);
+
+      const vaultPath = process.env.OBSIDIAN_VAULT_PATH || process.env.EXCALIDRAW_MCP_OBSIDIAN_VAULT;
+
+      if (vaultPath) {
+        try {
+          const fullPath = path.join(vaultPath, filename);
+          const dir = path.dirname(fullPath);
+          await fs.mkdir(dir, { recursive: true });
+          await fs.writeFile(fullPath, markdown, "utf-8");
+          return { content: [{ type: "text", text: `Created ${filename} in vault at ${fullPath}.` }] };
+        } catch (err) {
+          return {
+            content: [{ type: "text", text: `Could not write to vault: ${(err as Error).message}. Check OBSIDIAN_VAULT_PATH.` }],
+            isError: true,
+          };
+        }
+      }
+
+      const envCli = process.env.OBSIDIAN_CLI_PATH || process.env.EXCALIDRAW_MCP_OBSIDIAN_CLI;
+      const defaultMacPath = "/Applications/Obsidian.app/Contents/MacOS/obsidian";
+      const cliPath =
+        envCli ||
+        (platform() === "darwin" && existsSync(defaultMacPath) ? defaultMacPath : "obsidian");
+
+      try {
+        const result = await new Promise<{ stdout: string; stderr: string; code: number | null }>((resolve, reject) => {
+          const proc = spawn(cliPath, ["create", filename, "--content", markdown], {
+            stdio: ["ignore", "pipe", "pipe"],
+          });
+          let stdout = "";
+          let stderr = "";
+          proc.stdout?.on("data", (d) => { stdout += String(d); });
+          proc.stderr?.on("data", (d) => { stderr += String(d); });
+          proc.on("error", (err) => reject(err));
+          proc.on("close", (code) => resolve({ stdout, stderr, code: code ?? null }));
+        });
+        if (result.code !== 0) {
+          return {
+            content: [{ type: "text", text: `Obsidian CLI failed: ${result.stderr || result.stdout || "non-zero exit"}` }],
+            isError: true,
+          };
+        }
+        return { content: [{ type: "text", text: `Created ${filename} in Obsidian vault.` }] };
+      } catch (err) {
+        const msg = (err as NodeJS.ErrnoException).code === "ENOENT"
+          ? "Obsidian CLI not found. Set OBSIDIAN_CLI_PATH to the full path of the obsidian binary (e.g. from \"which obsidian\"), or set OBSIDIAN_VAULT_PATH to your vault folder to save directly."
+          : `create_in_obsidian failed: ${(err as Error).message}`;
+        return { content: [{ type: "text", text: msg }], isError: true };
+      }
+    },
+  );
+
+  // ============================================================
+  // Tool 6: read_checkpoint (private — widget only)
   // ============================================================
   registerAppTool(server,
     "read_checkpoint",

@@ -115,6 +115,28 @@ npm run dev
 }
 ```
 
+## Create in Obsidian
+
+The MCP exposes a **create in Obsidian** operation that only the **app** can call (not the agent). The widget shows a **Create in Obsidian** button under the canvas; when the user clicks it, a modal asks for a **diagram title** (description of what the diagram is about). The file is saved as **{title}.md** in the vault, using the **obsidian-excalidraw plugin** markdown format: frontmatter (`excalidraw-plugin: parsed`, `tags: [excalidraw]`), Excalidraw Data section, Text Elements list, and a Drawing block with the full Excalidraw JSON in a fenced code block.
+
+The server tries, in order:
+
+1. **`OBSIDIAN_VAULT_PATH`** (or **`EXCALIDRAW_MCP_OBSIDIAN_VAULT`**): if set, the server writes the file directly into that folder (no CLI, no spawn). **Recommended:** fast, no timeouts, works everywhere. Set this to the absolute path of your Obsidian vault folder.
+2. **Obsidian CLI**: runs `obsidian create <filename> --content <json>`. On macOS the server may try the default app path. **Warning:** spawning the Obsidian binary can be slow or block (e.g. open GUI), which can cause MCP request timeouts. Prefer `OBSIDIAN_VAULT_PATH` for reliable behavior.
+3. **`OBSIDIAN_CLI_PATH`** (or **`EXCALIDRAW_MCP_OBSIDIAN_CLI`**): if set, the server uses this as the full path to the `obsidian` binary when not using the vault path.
+
+Examples (stdio / Claude Desktop):
+
+```bash
+# Option A: use vault path (no CLI needed)
+OBSIDIAN_VAULT_PATH=/Users/you/obsidian-vault node dist/index.js --stdio
+
+# Option B: point to the obsidian binary (from "which obsidian")
+OBSIDIAN_CLI_PATH=/opt/homebrew/bin/obsidian node dist/index.js --stdio
+```
+
+In Claude Desktop, set the env var in the config if your client supports it, or wrap the command in a script that exports the var then runs `node dist/index.js --stdio`.
+
 ## Rendering Pipeline
 
 ### Streaming (`ontoolinputpartial`)

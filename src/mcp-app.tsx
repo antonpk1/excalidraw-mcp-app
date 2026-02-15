@@ -401,6 +401,175 @@ async function shareToExcalidraw(api: any, app: App) {
   }
 }
 
+/** Derive a suggested diagram title from element text (e.g. "Intuition - Intuition-rs repo Architecture"). */
+function deriveTitleFromElements(elements: any[]): string {
+  const seen = new Set<string>();
+  const parts: string[] = [];
+  const add = (s: string) => {
+    const t = (s ?? "").replace(/\n/g, " ").trim().slice(0, 60);
+    if (t && !seen.has(t.toLowerCase())) {
+      seen.add(t.toLowerCase());
+      parts.push(t);
+    }
+  };
+  for (const el of elements) {
+    if (!el || el.isDeleted) continue;
+    if (el.type === "text") add(el.text ?? el.rawText ?? "");
+    else if (el.label?.text) add(el.label.text);
+  }
+  const joined = parts.slice(0, 3).join(" - ").trim();
+  return joined || "diagram";
+}
+
+/** Build full Excalidraw document JSON for .excalidraw file (obsidian-excalidraw plugin). */
+function buildExcalidrawDocumentJson(elements: any[], appState?: any, files?: Record<string, any>): string {
+  const appStateSafe = appState ?? {
+    viewBackgroundColor: "#ffffff",
+    currentItemFontFamily: 1,
+    exportBackground: false,
+    exportScale: 1,
+    exportWithDarkMode: false,
+    gridSize: null,
+    name: "Untitled",
+    previousSelectedElementIds: {},
+    scrollX: 0,
+    scrollY: 0,
+    selectedElementIds: {},
+    shouldAddWatermark: false,
+    showStats: false,
+    theme: "light",
+    viewState: {},
+    zoom: { value: 1 },
+  };
+  const filesSafe = files ?? {};
+  const doc = {
+    type: "excalidraw",
+    version: 2,
+    source: "https://excalidraw.com",
+    elements: elements.filter((el: any) => el && !el.isDeleted),
+    appState: appStateSafe,
+    files: filesSafe,
+  };
+  return JSON.stringify(doc);
+}
+
+function CreateInObsidianButton({
+  app,
+  elements,
+  excalidrawApi,
+}: {
+  app: App;
+  elements: any[];
+  excalidrawApi: any;
+}) {
+  const [state, setState] = useState<"idle" | "confirm" | "creating" | "success" | "error">("idle");
+  const [titleDraft, setTitleDraft] = useState("diagram");
+  const [errorMsg, setErrorMsg] = useState<string>("");
+
+  const openModal = useCallback(() => {
+    setTitleDraft(deriveTitleFromElements(elements));
+    setState("confirm");
+  }, [elements]);
+
+  const doCreate = useCallback(async (title: string) => {
+    if (elements.length === 0) return;
+    setState("creating");
+    setErrorMsg("");
+    try {
+      let json: string;
+      if (excalidrawApi) {
+        const els = excalidrawApi.getSceneElements();
+        const appState = excalidrawApi.getAppState();
+        const files = excalidrawApi.getFiles();
+        json = serializeAsJSON(els ?? elements, appState ?? {}, files ?? {}, "database");
+      } else {
+        json = buildExcalidrawDocumentJson(elements);
+      }
+      const result = await app.callServerTool({
+        name: "create_in_obsidian",
+        arguments: { json, title: title.trim() || "diagram" },
+      });
+      if (result.isError) {
+        const text = (result.content[0] as any)?.text ?? "Unknown error";
+        setErrorMsg(text);
+        setState("error");
+      } else {
+        setState("success");
+        setTimeout(() => setState("idle"), 2000);
+      }
+    } catch (err) {
+      setErrorMsg((err as Error).message);
+      setState("error");
+    }
+  }, [app, elements, excalidrawApi]);
+
+  const label =
+    state === "creating" ? "Creating…" :
+    state === "success" ? "Created in Obsidian" :
+    state === "error" ? "Failed" : "Create in Obsidian";
+
+  return (
+    <div className="create-in-obsidian-wrap" style={{ pointerEvents: "auto" }}>
+      <button
+        className="standalone"
+        type="button"
+        title="Save diagram as .md file in Obsidian vault"
+        disabled={state === "creating"}
+        onClick={openModal}
+        style={{ display: "flex", alignItems: "center", gap: 5, width: "auto", padding: "0 10px", fontSize: "0.75rem", fontWeight: 400 }}
+      >
+        <span>{label}</span>
+      </button>
+      {state === "confirm" && (
+        <div className="export-modal-overlay" onClick={() => setState("idle")}>
+          <div className="Island export-modal export-modal-create-obsidian" onClick={(e) => e.stopPropagation()}>
+            <h3 className="export-modal-title">Create in Obsidian</h3>
+            <p className="export-modal-text">
+              File will be saved as <strong>{titleDraft.trim() || "diagram"}.md</strong> in your vault.
+            </p>
+            <label style={{ display: "block", marginBottom: 8, fontSize: "0.85rem" }}>
+              Diagram title (filename):
+            </label>
+            <input
+              type="text"
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  setState("creating");
+                  doCreate(titleDraft);
+                }
+              }}
+              placeholder="diagram"
+              className="standalone"
+              style={{ width: "100%", padding: "6px 10px", marginBottom: 12, boxSizing: "border-box" }}
+              autoFocus
+            />
+            <div className="export-modal-actions">
+              <button type="button" className="standalone" onClick={() => setState("idle")}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="standalone export-modal-confirm"
+                onClick={() => { setState("creating"); doCreate(titleDraft); }}
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {state === "error" && errorMsg && (
+        <span className="create-in-obsidian-error" style={{ fontSize: "0.7rem", color: "var(--color-danger, #c92a2a)", marginLeft: 8 }} title={errorMsg}>
+          {errorMsg.length > 40 ? `${errorMsg.slice(0, 40)}…` : errorMsg}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function ShareButton({ onConfirm }: { onConfirm: () => Promise<void> }) {
   const [state, setState] = useState<"idle" | "confirm" | "uploading">("idle");
 
@@ -1052,6 +1221,12 @@ function ExcalidrawApp() {
               return JSON.parse(text);
             } catch { return null; }
           }} />
+        </div>
+      )}
+      {/* Footer: Create in Obsidian — visible when there is a diagram */}
+      {inputIsFinal && elements.length > 0 && app && (
+        <div className="canvas-footer">
+          <CreateInObsidianButton app={app} elements={elements} excalidrawApi={excalidrawApi} />
         </div>
       )}
     </main>

@@ -133,6 +133,28 @@ body {
   display: none !important;
 }
 
+/* Footer under canvas: Create in Obsidian */
+.canvas-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  gap: 8px;
+  pointer-events: auto;
+  flex-shrink: 0;
+}
+
+.canvas-footer .create-in-obsidian-wrap {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.canvas-footer .standalone {
+  min-height: 28px;
+}
+
 .excalidraw-container {
   width: 100%;
   position: relative;
@@ -262,6 +284,19 @@ body {
   min-width: 320px;
   max-width: 400px;
   padding: 24px !important;
+  background: var(--bg-color, #ffffff);
+  border-radius: 8px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+}
+
+.export-modal-create-obsidian {
+  background: var(--bg-color, #2d2d2d);
+  color: var(--text-color, #e5e5e5);
+}
+
+.export-modal-create-obsidian .export-modal-title,
+.export-modal-create-obsidian .export-modal-text {
+  color: inherit;
 }
 
 .export-modal-title {
