@@ -71,9 +71,11 @@ function resolveArrowPositions(elements: any[]): void {
 
   for (const el of elements) {
     if (el.type !== "arrow") continue;
-    // Skip arrows that already have valid coordinates
-    if (typeof el.x === "number" && !isNaN(el.x) &&
-        typeof el.y === "number" && !isNaN(el.y)) continue;
+    // Skip unbound arrows (manually positioned with x/y/points)
+    if (!el.startBinding && !el.endBinding) continue;
+    // Skip bound arrows that already have resolved coordinates
+    // (el.x == null catches both undefined and null but not 0, which is a valid coordinate)
+    if (el.x != null && el.y != null) continue;
 
     const startShape = el.startBinding?.elementId ? byId.get(el.startBinding.elementId) : null;
     const endShape = el.endBinding?.elementId ? byId.get(el.endBinding.elementId) : null;
@@ -110,10 +112,10 @@ function resolveArrowPositions(elements: any[]): void {
   // Fix arrow-bound label text with null coordinates
   for (const el of elements) {
     if (el.type !== "text" || !el.containerId) continue;
-    if (typeof el.x === "number" && !isNaN(el.x) && el.x !== null) continue;
+    if (el.x != null && el.y != null) continue;
     const container = byId.get(el.containerId);
     if (!container || container.type !== "arrow") continue;
-    if (typeof container.x !== "number" || isNaN(container.x)) continue;
+    if (container.x == null) continue;
     const pts = container.points;
     if (!pts || pts.length < 2) continue;
     const midX = container.x + (pts[0][0] + pts[pts.length - 1][0]) / 2;
