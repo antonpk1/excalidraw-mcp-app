@@ -100,7 +100,9 @@ body {
   position: absolute;
   top: 8px;
   right: 8px;
-  z-index: 100;
+  z-index: 10000;
+  display: flex;
+  gap: 4px;
   opacity: 0;
   transition: opacity 0.2s ease;
 }
@@ -109,8 +111,9 @@ body {
   opacity: 1;
 }
 
-/* Fullscreen button */
-.fullscreen-btn {
+/* Toolbar buttons (shared) */
+.fullscreen-btn,
+.mute-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -129,7 +132,8 @@ body {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
-.fullscreen-btn:hover {
+.fullscreen-btn:hover,
+.mute-btn:hover {
   color: rgba(0, 0, 0, 0.7);
   background: rgba(255, 255, 255, 0.8);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
@@ -138,6 +142,36 @@ body {
 /* Hide fullscreen button in fullscreen mode (host provides exit UI) */
 .main.fullscreen .fullscreen-btn {
   display: none !important;
+}
+
+/* Reposition toolbar in fullscreen to sit beside Excalidraw's top-right UI */
+.main.fullscreen .toolbar {
+  right: 100px;
+  top: 12px;
+  opacity: 1;
+}
+
+.main.fullscreen .mute-btn {
+  width: 36px;
+  height: 36px;
+  background: var(--island-bg-color, #ffffff);
+  color: var(--color-on-surface, #1b1b1f);
+  border: 1px solid var(--default-border-color, #e4e4eb);
+  border-radius: 8px;
+  box-shadow: var(--shadow-island, 0 1px 4px rgba(0, 0, 0, 0.08));
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.main.fullscreen .mute-btn:hover {
+  background: var(--color-surface-mid, #f1f0ff);
+  color: var(--color-on-surface, #1b1b1f);
+  box-shadow: var(--shadow-island, 0 1px 4px rgba(0, 0, 0, 0.08));
+}
+
+.main.fullscreen .mute-btn svg {
+  width: 18px;
+  height: 18px;
 }
 
 .excalidraw-container {

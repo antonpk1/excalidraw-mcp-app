@@ -12,6 +12,25 @@ let softBuffer: AudioBuffer | null = null;
 let initialized = false;
 let initPromise: Promise<void> | null = null;
 
+const MUTED_KEY = "excalidraw:muted";
+
+let muted: boolean = (() => {
+  try {
+    const stored = localStorage.getItem(MUTED_KEY);
+    return stored === null ? true : stored === "true";
+  } catch { return true; }
+})();
+
+export function isMuted(): boolean {
+  return muted;
+}
+
+export function toggleMute(): boolean {
+  muted = !muted;
+  try { localStorage.setItem(MUTED_KEY, String(muted)); } catch {}
+  return muted;
+}
+
 function getAudioContext(): AudioContext {
   if (!audioCtx) {
     audioCtx = new AudioContext();
@@ -46,7 +65,7 @@ export async function initPencilAudio(): Promise<void> {
 
 /** Play a pencil stroke sound for a given element type. */
 export function playStroke(elementType: string): void {
-  if (!initialized || !audioCtx) return;
+  if (muted || !initialized || !audioCtx) return;
 
   // Use soft stroke for all element types
   const isLine = elementType === "arrow" || elementType === "line";
