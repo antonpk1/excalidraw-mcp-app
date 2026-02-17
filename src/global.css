@@ -85,6 +85,11 @@ body {
   height: 100%;
 }
 
+/* Inline editor mode (no fullscreen available) */
+.main.inline-editor {
+  overflow: hidden;
+}
+
 /* Hide library button in fullscreen editor */
 .main.fullscreen .default-sidebar-trigger {
   display: none !important;
@@ -101,6 +106,8 @@ body {
   top: 8px;
   right: 8px;
   z-index: 100;
+  display: flex;
+  gap: 4px;
   opacity: 0;
   transition: opacity 0.2s ease;
 }
@@ -109,8 +116,8 @@ body {
   opacity: 1;
 }
 
-/* Fullscreen button */
-.fullscreen-btn {
+/* Toolbar button */
+.toolbar-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -129,14 +136,14 @@ body {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
-.fullscreen-btn:hover {
+.toolbar-btn:hover {
   color: rgba(0, 0, 0, 0.7);
   background: rgba(255, 255, 255, 0.8);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
 }
 
-/* Hide fullscreen button in fullscreen mode (host provides exit UI) */
-.main.fullscreen .fullscreen-btn {
+/* Hide toolbar button in fullscreen mode (host provides exit UI) */
+.main.fullscreen .toolbar-btn {
   display: none !important;
 }
 
