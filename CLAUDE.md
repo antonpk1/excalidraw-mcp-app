@@ -5,10 +5,15 @@ Standalone MCP server that streams Excalidraw diagrams as SVG with hand-drawn an
 ## Architecture
 
 ```
-server.ts        → 2 tools (read_me, create_view) + resource + cheat sheet
-main.ts          → HTTP (Streamable) + stdio transports
-src/mcp-app.tsx  → React widget: SVG-only rendering via exportToSvg + morphdom
-src/global.css   → Animations (stroke draw-on, fade-in) + auto-resize
+server.ts          → 2 tools (read_me, create_view) + resource + cheat sheet
+main.ts            → HTTP (Streamable) + stdio transports
+src/mcp-app.tsx    → ExcalidrawAppCore (widget logic) + ExcalidrawApp (useApp wrapper)
+src/mcp-entry.tsx  → Production entry point: createRoot + ExcalidrawApp
+src/global.css     → Animations (stroke draw-on, fade-in) + auto-resize
+src/dev.tsx        → Dev entry point: mock app + sample elements + control panel
+src/dev-mock.ts    → Mock MCP App with event simulation (sendToolInput, streamElements, etc.)
+index-dev.html     → Dev HTML entry (served by vite dev server)
+vite.config.dev.ts → Dev-only vite config (resolves from node_modules, no esm.sh externals)
 ```
 
 ## Tools
@@ -100,8 +105,12 @@ npm run serve          # or: bun --watch main.ts
 # stdio — for Claude Desktop
 node dist/index.js --stdio
 
-# Dev mode (watch + serve)
+# Dev mode (watch + serve) — full MCP flow
 npm run dev
+
+# Dev mode (standalone UI) — no MCP server needed
+npm run dev:ui
+# Opens http://localhost:5173/index-dev.html with mock app + sample diagram
 ```
 
 ## Claude Desktop config

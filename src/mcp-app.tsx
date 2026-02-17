@@ -3,7 +3,6 @@ import type { App } from "@modelcontextprotocol/ext-apps";
 import { Excalidraw, exportToSvg, convertToExcalidrawElements, restore, CaptureUpdateAction, FONT_FAMILY, serializeAsJSON } from "@excalidraw/excalidraw";
 import morphdom from "morphdom";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createRoot } from "react-dom/client";
 import { initPencilAudio, playStroke } from "./pencil-audio";
 import { captureInitialElements, onEditorChange, setStorageKey, loadPersistedElements, getLatestEditedElements, setCheckpointId } from "./edit-context";
 import "./global.css";
@@ -635,7 +634,7 @@ function DiagramView({ toolInput, isFinal, displayMode, onElements, editedElemen
 // Main app — Excalidraw only
 // ============================================================
 
-function ExcalidrawApp() {
+export function ExcalidrawAppCore({ app }: { app: App }) {
   const [toolInput, setToolInput] = useState<any>(null);
   const [inputIsFinal, setInputIsFinal] = useState(false);
   const [displayMode, setDisplayMode] = useState<"inline" | "fullscreen">("inline");
@@ -751,71 +750,65 @@ function ExcalidrawApp() {
   // Keep elementsRef in sync for ontoolresult handler (which captures closure once)
   useEffect(() => { elementsRef.current = elements; }, [elements]);
 
-  const { app, error } = useApp({
-    appInfo: { name: "Excalidraw", version: "1.0.0" },
-    capabilities: {},
-    onAppCreated: (app) => {
-      appRef.current = app;
-      _logFn = (msg) => { try { app.sendLog({ level: "info", logger: "FS", data: msg }); } catch {} };
+  // Set up MCP event handlers when app is provided
+  useEffect(() => {
+    appRef.current = app;
+    _logFn = (msg) => { try { app.sendLog({ level: "info", logger: "FS", data: msg }); } catch {} };
 
-      // Capture initial container dimensions
-      const initDims = app.getHostContext()?.containerDimensions as any;
-      if (initDims?.height) setContainerHeight(initDims.height);
+    // Capture initial container dimensions
+    const initDims = app.getHostContext()?.containerDimensions as any;
+    if (initDims?.height) setContainerHeight(initDims.height);
 
-      app.onhostcontextchanged = (ctx: any) => {
-        if (ctx.containerDimensions?.height) {
-          setContainerHeight(ctx.containerDimensions.height);
-        }
-        if (ctx.displayMode) {
-          fsLog(`hostContextChanged: displayMode=${ctx.displayMode}`);
-          // Sync edited elements when host exits fullscreen
-          if (ctx.displayMode === "inline") {
-            const edited = getLatestEditedElements();
-            if (edited) {
-              setElements(edited);
-              setUserEdits(edited);
-            }
-          }
-          setDisplayMode(ctx.displayMode as "inline" | "fullscreen");
-        }
-      };
-
-      app.ontoolinputpartial = async (input) => {
-        const args = (input as any)?.arguments || input;
-        setInputIsFinal(false);
-        setToolInput(args);
-      };
-
-      app.ontoolinput = async (input) => {
-        const args = (input as any)?.arguments || input;
-        setInputIsFinal(true);
-        setToolInput(args);
-      };
-
-      app.ontoolresult = (result: any) => {
-        const cpId = (result.structuredContent as { checkpointId?: string })?.checkpointId;
-        if (cpId) {
-          checkpointIdRef.current = cpId;
-          setCheckpointId(cpId);
-          // Use checkpointId as localStorage key for persisting user edits
-          setStorageKey(cpId);
-          // Check for persisted edits from a previous fullscreen session
-          const persisted = loadPersistedElements();
-          if (persisted && persisted.length > 0) {
-            elementsRef.current = persisted;
-            setElements(persisted);
-            setUserEdits(persisted);
+    app.onhostcontextchanged = (ctx: any) => {
+      if (ctx.containerDimensions?.height) {
+        setContainerHeight(ctx.containerDimensions.height);
+      }
+      if (ctx.displayMode) {
+        fsLog(`hostContextChanged: displayMode=${ctx.displayMode}`);
+        // Sync edited elements when host exits fullscreen
+        if (ctx.displayMode === "inline") {
+          const edited = getLatestEditedElements();
+          if (edited) {
+            setElements(edited);
+            setUserEdits(edited);
           }
         }
-      };
+        setDisplayMode(ctx.displayMode as "inline" | "fullscreen");
+      }
+    };
 
-      app.onteardown = async () => ({});
-      app.onerror = (err) => console.error("[Excalidraw] Error:", err);
-    },
-  });
+    app.ontoolinputpartial = async (input) => {
+      const args = (input as any)?.arguments || input;
+      setInputIsFinal(false);
+      setToolInput(args);
+    };
 
-  if (error) return <div className="error">ERROR: {error.message}</div>;
-  if (!app) return <div className="loading">Connecting...</div>;
+    app.ontoolinput = async (input) => {
+      const args = (input as any)?.arguments || input;
+      setInputIsFinal(true);
+      setToolInput(args);
+    };
+
+    app.ontoolresult = (result: any) => {
+      const cpId = (result.structuredContent as { checkpointId?: string })?.checkpointId;
+      if (cpId) {
+        checkpointIdRef.current = cpId;
+        setCheckpointId(cpId);
+        // Use checkpointId as localStorage key for persisting user edits
+        setStorageKey(cpId);
+        // Check for persisted edits from a previous fullscreen session
+        const persisted = loadPersistedElements();
+        if (persisted && persisted.length > 0) {
+          elementsRef.current = persisted;
+          setElements(persisted);
+          setUserEdits(persisted);
+        }
+      }
+    };
+
+    app.onteardown = async () => ({});
+    app.onerror = (err) => console.error("[Excalidraw] Error:", err);
+  }, [app]);
 
   return (
     <main className={`main${displayMode === "fullscreen" ? " fullscreen" : ""}`} style={displayMode === "fullscreen" && containerHeight ? { height: containerHeight } : undefined}>
@@ -875,4 +868,13 @@ function ExcalidrawApp() {
   );
 }
 
-createRoot(document.body).render(<ExcalidrawApp />);
+export function ExcalidrawApp() {
+  const { app, error } = useApp({
+    appInfo: { name: "Excalidraw", version: "1.0.0" },
+    capabilities: {},
+  });
+
+  if (error) return <div className="error">ERROR: {error.message}</div>;
+  if (!app) return <div className="loading">Connecting...</div>;
+  return <ExcalidrawAppCore app={app} />;
+}
