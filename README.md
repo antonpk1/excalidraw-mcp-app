@@ -10,7 +10,7 @@ Works with any client that supports [MCP Apps](https://modelcontextprotocol.io/d
 
 ### Remote (recommended)
 
-### `https://mcp.excalidraw.com/mcp`
+### `https://mcp.excalidraw.com`
 
 For apps that don't yet have an official integration, you can add a custom MCP / connector (naming can vary between apps).
 
