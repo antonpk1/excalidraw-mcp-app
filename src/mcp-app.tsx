@@ -1,6 +1,15 @@
 import { useApp } from "@modelcontextprotocol/ext-apps/react";
 import type { App } from "@modelcontextprotocol/ext-apps";
-import { Excalidraw, exportToSvg, convertToExcalidrawElements, restore, CaptureUpdateAction, FONT_FAMILY, serializeAsJSON } from "@excalidraw/excalidraw";
+import {
+  Excalidraw,
+  exportToSvg,
+  convertToExcalidrawElements,
+  restore,
+  CaptureUpdateAction,
+  FONT_FAMILY,
+  serializeAsJSON,
+  MainMenu,
+} from "@excalidraw/excalidraw";
 import morphdom from "morphdom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { initPencilAudio, playStroke } from "./pencil-audio";
@@ -150,16 +159,38 @@ async function shareToExcalidraw(api: any, app: App) {
   }
 }
 
-function ShareButton({ onConfirm }: { onConfirm: () => Promise<void> }) {
+function ShareButton({
+  onExport,
+  onCopyJson,
+  onCopySvg,
+}: {
+  onExport: () => Promise<void>;
+  onCopyJson: () => Promise<void>;
+  onCopySvg: () => Promise<void>;
+}) {
   const [state, setState] = useState<"idle" | "confirm" | "uploading">("idle");
+  const [copyJsonState, setCopyJsonState] = useState<"idle" | "copied">("idle");
+  const [copySvgState, setCopySvgState] = useState<"idle" | "copied">("idle");
 
-  const handleConfirm = async () => {
+  const handleExport = async () => {
     setState("uploading");
     try {
-      await onConfirm();
+      await onExport();
     } finally {
       setState("idle");
     }
+  };
+
+  const handleCopyJson = async () => {
+    await onCopyJson();
+    setCopyJsonState("copied");
+    setTimeout(() => setCopyJsonState("idle"), 2000);
+  };
+
+  const handleCopySvg = async () => {
+    await onCopySvg();
+    setCopySvgState("copied");
+    setTimeout(() => setCopySvgState("idle"), 2000);
   };
 
   return (
@@ -167,27 +198,38 @@ function ShareButton({ onConfirm }: { onConfirm: () => Promise<void> }) {
       <button
         className="standalone"
         style={{ display: "flex", alignItems: "center", gap: 5, width: "auto", padding: "0 10px", marginRight: -8 }}
-        title="Export to Excalidraw"
+        title="Save or Export Diagram"
         disabled={state === "uploading"}
         onClick={() => setState("confirm")}
       >
         <ExternalLinkIcon />
-        <span style={{ fontSize: "0.75rem", fontWeight: 400 }}>{state === "uploading" ? "Exporting…" : "Export"}</span>
+        <span style={{ fontSize: "0.75rem", fontWeight: 400 }}>{state === "uploading" ? "Saving…" : "Save / Export"}</span>
       </button>
 
       {state === "confirm" && (
         <div className="export-modal-overlay" onClick={() => setState("idle")}>
           <div className="Island export-modal" onClick={(e) => e.stopPropagation()}>
-            <h3 className="export-modal-title">Export to Excalidraw</h3>
-            <p className="export-modal-text">
-              This will upload your diagram to excalidraw.com and open it in a new tab.
+            <h3 className="export-modal-title">Save or Export Diagram</h3>
+            <p className="export-modal-text" style={{ marginBottom: 15 }}>
+              Choose how you would like to save your work:
             </p>
-            <div className="export-modal-actions">
-              <button className="standalone" onClick={() => setState("idle")}>
-                Cancel
+            <div className="export-modal-actions" style={{ flexDirection: "column", alignItems: "stretch", gap: 8 }}>
+              <button className="standalone export-modal-confirm" onClick={handleExport}>
+                Export to Excalidraw.com (best for saving/printing)
               </button>
-              <button className="standalone export-modal-confirm" onClick={handleConfirm}>
-                Export
+              <div style={{ height: 1, background: "var(--border-color)", margin: "4px 0" }} />
+              <button className="standalone" onClick={handleCopyJson}>
+                {copyJsonState === "idle" ? "Copy JSON to Clipboard (.excalidraw)" : "✓ JSON Copied!"}
+              </button>
+              <button className="standalone" onClick={handleCopySvg}>
+                {copySvgState === "idle" ? "Copy SVG to Clipboard (visual diagram)" : "✓ SVG Copied!"}
+              </button>
+              <button
+                className="standalone"
+                style={{ marginTop: 8, opacity: 0.6 }}
+                onClick={() => setState("idle")}
+              >
+                Close
               </button>
             </div>
           </div>
@@ -837,14 +879,56 @@ export function ExcalidrawAppCore({ app }: { app: App }) {
             initialData={{ elements: elements as any, scrollToContent: true }}
             theme="light"
             onChange={(els) => onEditorChange(app, els)}
+            UIOptions={{
+              canvasActions: {
+                saveToActiveFile: false,
+                export: false,
+                saveAsImage: false,
+                loadScene: false,
+              },
+            }}
             renderTopRightUI={() => (
               <ShareButton
-                onConfirm={async () => {
+                onExport={async () => {
                   if (excalidrawApi) await shareToExcalidraw(excalidrawApi, app);
+                }}
+                onCopyJson={async () => {
+                  if (!excalidrawApi) return;
+                  try {
+                    const elements = excalidrawApi.getSceneElements();
+                    const appState = excalidrawApi.getAppState();
+                    const files = excalidrawApi.getFiles();
+                    const json = serializeAsJSON(elements, appState, files, "database");
+                    await navigator.clipboard.writeText(json);
+                  } catch (err) {
+                    fsLog(`Copy failed: ${err}`);
+                  }
+                }}
+                onCopySvg={async () => {
+                  if (!excalidrawApi) return;
+                  try {
+                    const elements = excalidrawApi.getSceneElements();
+                    const appState = excalidrawApi.getAppState();
+                    const files = excalidrawApi.getFiles();
+                    const svg = await exportToSvg({
+                      elements,
+                      appState: { ...appState, viewBackgroundColor: "#ffffff", exportBackground: true },
+                      files,
+                    });
+                    await navigator.clipboard.writeText(svg.outerHTML);
+                  } catch (err) {
+                    fsLog(`Copy SVG failed: ${err}`);
+                  }
                 }}
               />
             )}
-          />
+          >
+            <MainMenu>
+              <MainMenu.DefaultItems.ClearCanvas />
+              <MainMenu.DefaultItems.ToggleTheme />
+              <MainMenu.DefaultItems.ChangeCanvasBackground />
+            </MainMenu>
+          </Excalidraw>
         </div>
       )}
       {/* SVG: stays visible until editor is fully settled */}
