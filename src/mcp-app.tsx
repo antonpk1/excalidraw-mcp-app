@@ -632,7 +632,6 @@ function DiagramView({ toolInput, isFinal, displayMode, onElements, editedElemen
 // ============================================================
 
 const excalidrawLogo = <svg
-      aria-hidden="true"
       focusable="false"
       role="img"
       viewBox="0 0 40 40"
@@ -645,6 +644,12 @@ const excalidrawLogo = <svg
     />
   </g>
     </svg>
+
+  const githubIcon = <svg focusable="false" role="img" viewBox="0 0 20 20"  fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 15.833c-3.583 1.167-3.583-2.083-5-2.5m10 4.167v-2.917c0-.833.083-1.166-.417-1.666 2.334-.25 4.584-1.167 4.584-5a3.833 3.833 0 0 0-1.084-2.667 3.5 3.5 0 0 0-.083-2.667s-.917-.25-2.917 1.084a10.25 10.25 0 0 0-5.166 0C5.417 2.333 4.5 2.583 4.5 2.583a3.5 3.5 0 0 0-.083 2.667 3.833 3.833 0 0 0-1.084 2.667c0 3.833 2.25 4.75 4.584 5-.5.5-.5 1-.417 1.666V17.5" stroke-width="1.25"></path></svg>
+
+  const twitterIcon = <svg focusable="false" role="img" viewBox="0 0 24 24"  fill="none" stroke-width="2" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><g stroke-width="1.25"><path stroke="none" d="M0 0h24v24H0z" fill="none"></path><path d="M4 4l11.733 16h4.267l-11.733 -16z"></path><path d="M4 20l6.768 -6.768m2.46 -2.46l6.772 -6.772"></path></g></svg>
+
+  const discordIcon = <svg focusable="false" role="img" viewBox="0 0 20 20"  fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><g stroke-width="1.25"><path d="M7.5 10.833a.833.833 0 1 0 0-1.666.833.833 0 0 0 0 1.666ZM12.5 10.833a.833.833 0 1 0 0-1.666.833.833 0 0 0 0 1.666ZM6.25 6.25c2.917-.833 4.583-.833 7.5 0M5.833 13.75c2.917.833 5.417.833 8.334 0"></path><path d="M12.917 14.167c0 .833 1.25 2.5 1.666 2.5 1.25 0 2.361-1.39 2.917-2.5.556-1.39.417-4.861-1.25-9.584-1.214-.846-2.5-1.116-3.75-1.25l-.833 2.084M7.083 14.167c0 .833-1.13 2.5-1.526 2.5-1.191 0-2.249-1.39-2.778-2.5-.529-1.39-.397-4.861 1.19-9.584 1.157-.846 2.318-1.116 3.531-1.25l.833 2.084"></path></g></svg>
 
 
 export function ExcalidrawAppCore({ app }: { app: App }) {
@@ -879,12 +884,42 @@ export function ExcalidrawAppCore({ app }: { app: App }) {
               <MainMenu.Item
                 onSelect={() => {
                   app.openLink({
-                    url: "https://plus.excalidraw.com?utm_source=mcp&utm_medium=app&utm_content=main_menu"
+                    url: "https://plus.excalidraw.com?utm_source=mcp_app_menu"
                   })
                 }}
                 style={{minWidth: 200}}
               >
                 {excalidrawLogo} Excalidraw
+              </MainMenu.Item>
+              <MainMenu.Item
+                onSelect={() => {
+                  app.openLink({
+                    url: "https://github.com/excalidraw/excalidraw"
+                  })
+                }}
+                style={{minWidth: 200}}
+              >
+                {githubIcon} GitHub
+              </MainMenu.Item>
+              <MainMenu.Item
+                onSelect={() => {
+                  app.openLink({
+                    url: "https://x.com/excalidraw"
+                  })
+                }}
+                style={{minWidth: 200}}
+              >
+                {twitterIcon} Follow us
+              </MainMenu.Item>
+              <MainMenu.Item
+                onSelect={() => {
+                  app.openLink({
+                    url: "https://discord.gg/UexuTaE"
+                  })
+                }}
+                style={{minWidth: 200}}
+              >
+                {discordIcon} Discord chat
               </MainMenu.Item>
             </MainMenu >
           </Excalidraw>
