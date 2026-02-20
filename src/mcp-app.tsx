@@ -42,17 +42,117 @@ interface ViewportRect {
   height: number;
 }
 
+/** Find the edge midpoint of a shape closest to a target point.
+ *  Works for rectangles, diamonds, and ellipses (uses bounding-box cardinal points). */
+function closestEdgeMidpoint(shape: any, tx: number, ty: number): [number, number] {
+  const cx = shape.x + shape.width / 2;
+  const cy = shape.y + shape.height / 2;
+  const edges: [number, number][] = [
+    [shape.x + shape.width, cy],   // right
+    [shape.x, cy],                  // left
+    [cx, shape.y],                  // top
+    [cx, shape.y + shape.height],   // bottom
+  ];
+  let best = edges[0];
+  let bestDist = Infinity;
+  for (const e of edges) {
+    const d = (e[0] - tx) ** 2 + (e[1] - ty) ** 2;
+    if (d < bestDist) { bestDist = d; best = e; }
+  }
+  return best;
+}
+
+/** Compute x/y/points for bound arrows that convertToExcalidrawElements left unpositioned.
+ *  Also fixes null-coordinate labels on arrows. Mutates elements in place. */
+function resolveArrowPositions(elements: any[]): void {
+  const byId = new Map<string, any>();
+  for (const el of elements) { if (el.id) byId.set(el.id, el); }
+
+  for (const el of elements) {
+    if (el.type !== "arrow") continue;
+    // Skip unbound arrows (manually positioned with x/y/points)
+    if (!el.startBinding && !el.endBinding) continue;
+    // Skip bound arrows that already have resolved coordinates
+    // (el.x == null catches both undefined and null but not 0, which is a valid coordinate)
+    if (el.x != null && el.y != null) continue;
+
+    const startShape = el.startBinding?.elementId ? byId.get(el.startBinding.elementId) : null;
+    const endShape = el.endBinding?.elementId ? byId.get(el.endBinding.elementId) : null;
+    if (!startShape && !endShape) continue;
+
+    let sx: number, sy: number, ex: number, ey: number;
+
+    if (startShape && endShape) {
+      const sCx = startShape.x + startShape.width / 2;
+      const sCy = startShape.y + startShape.height / 2;
+      const eCx = endShape.x + endShape.width / 2;
+      const eCy = endShape.y + endShape.height / 2;
+      [sx, sy] = closestEdgeMidpoint(startShape, eCx, eCy);
+      [ex, ey] = closestEdgeMidpoint(endShape, sCx, sCy);
+    } else if (startShape) {
+      sx = startShape.x + startShape.width;
+      sy = startShape.y + startShape.height / 2;
+      ex = sx + 100; ey = sy;
+    } else {
+      ex = endShape.x;
+      ey = endShape.y + endShape.height / 2;
+      sx = ex - 100; sy = ey;
+    }
+
+    el.x = sx;
+    el.y = sy;
+    const dx = ex - sx;
+    const dy = ey - sy;
+    el.width = Math.abs(dx);
+    el.height = Math.abs(dy);
+    el.points = [[0, 0], [dx, dy]];
+  }
+
+  // Fix arrow-bound label text with null coordinates
+  for (const el of elements) {
+    if (el.type !== "text" || !el.containerId) continue;
+    if (el.x != null && el.y != null) continue;
+    const container = byId.get(el.containerId);
+    if (!container || container.type !== "arrow") continue;
+    if (container.x == null) continue;
+    const pts = container.points;
+    if (!pts || pts.length < 2) continue;
+    const midX = container.x + (pts[0][0] + pts[pts.length - 1][0]) / 2;
+    const midY = container.y + (pts[0][1] + pts[pts.length - 1][1]) / 2;
+    el.x = midX - (el.width ?? 0) / 2;
+    el.y = midY - (el.height ?? 0) / 2;
+  }
+}
+
 /** Convert raw shorthand elements → Excalidraw format (labels → bound text, font fix).
- *  Preserves pseudo-elements like cameraUpdate (not valid Excalidraw types). */
-function convertRawElements(els: any[]): any[] {
+ *  Preserves pseudo-elements like cameraUpdate (not valid Excalidraw types).
+ *  Optional contextElements are prepended so arrow start/end can resolve IDs from
+ *  a checkpoint base, then stripped from the output. */
+function convertRawElements(els: any[], contextElements?: any[]): any[] {
   const pseudoTypes = new Set(["cameraUpdate", "delete", "restoreCheckpoint"]);
   const pseudos = els.filter((el: any) => pseudoTypes.has(el.type));
   const real = els.filter((el: any) => !pseudoTypes.has(el.type));
   const withDefaults = real.map((el: any) =>
     el.label ? { ...el, label: { textAlign: "center", verticalAlign: "middle", ...el.label } } : el
   );
-  const converted = convertToExcalidrawElements(withDefaults, { regenerateIds: false })
+
+  // Include context elements so arrow start/end can resolve IDs from checkpoint base
+  const contextReal = (contextElements ?? []).filter((el: any) => !pseudoTypes.has(el.type));
+  const allForConversion = [...contextReal, ...withDefaults];
+  const converted = convertToExcalidrawElements(allForConversion, { regenerateIds: false })
     .map((el: any) => el.type === "text" ? { ...el, fontFamily: (FONT_FAMILY as any).Excalifont ?? 1 } : el);
+
+  // Compute positions for bound arrows left unpositioned by convertToExcalidrawElements
+  resolveArrowPositions(converted);
+
+  // Return only the newly converted elements (strip context prefix)
+  if (contextReal.length > 0) {
+    const contextIds = new Set(contextReal.map((el: any) => el.id));
+    const newConverted = converted.filter((el: any) =>
+      !contextIds.has(el.id) && !contextIds.has(el.containerId)
+    );
+    return [...newConverted, ...pseudos];
+  }
   return [...converted, ...pseudos];
 }
 
@@ -342,8 +442,9 @@ function DiagramView({ toolInput, isFinal, displayMode, onElements, editedElemen
       // Wait for Virgil font to load before computing text metrics
       await ensureFontsLoaded();
 
-      // Convert new elements (raw → Excalidraw format)
-      const convertedNew = convertRawElements(els);
+      // Convert new elements (raw → Excalidraw format), passing base as context
+      // so arrow start/end bindings can resolve IDs from checkpoint base
+      const convertedNew = convertRawElements(els, baseElements);
       const baseReal = baseElements?.filter((el: any) => el.type !== "cameraUpdate") ?? [];
       const excalidrawEls = [...baseReal, ...convertedNew];
 
@@ -438,18 +539,19 @@ function DiagramView({ toolInput, isFinal, displayMode, onElements, editedElemen
 
       // Load checkpoint base if restoring (async — from server)
       let base: any[] | undefined;
+      let rawBase: any[] | undefined;
       const doFinal = async () => {
         if (restoreId && loadCheckpoint) {
           const saved = await loadCheckpoint(restoreId);
           if (saved) {
-            base = saved.elements;
+            rawBase = saved.elements;
             // Extract camera from base as fallback
             if (!viewport) {
-              const cam = base.find((el: any) => el.type === "cameraUpdate");
+              const cam = rawBase.find((el: any) => el.type === "cameraUpdate");
               if (cam) viewport = { x: cam.x, y: cam.y, width: cam.width, height: cam.height };
             }
             // Convert base with convertRawElements (handles both raw and already-converted)
-            base = convertRawElements(base);
+            base = convertRawElements(rawBase);
           }
           if (base && deleteIds.size > 0) {
             base = base.filter((el: any) => !deleteIds.has(el.id) && !deleteIds.has(el.containerId));
@@ -457,8 +559,9 @@ function DiagramView({ toolInput, isFinal, displayMode, onElements, editedElemen
         }
 
         latestRef.current = drawElements;
-        // Convert new elements for fullscreen editor
-        const convertedNew = convertRawElements(drawElements);
+        // Convert new elements for fullscreen editor, passing raw base as context
+        // so arrow start/end bindings can resolve IDs from checkpoint shapes
+        const convertedNew = convertRawElements(drawElements, rawBase);
 
         // Merge base (converted) + new converted
         const allConverted = base ? [...base, ...convertedNew] : convertedNew;
