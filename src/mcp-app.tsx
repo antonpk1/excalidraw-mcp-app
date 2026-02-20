@@ -876,10 +876,16 @@ export function ExcalidrawAppCore({ app }: { app: App }) {
             )}
           >
             <MainMenu>
-              <MainMenu.ItemLink href="https://plus.excalidraw.com?utm_source=mcp&utm_medium=app&utm_content=main_menu" style={{minWidth: 200}}>
+              <MainMenu.Item
+                onSelect={() => {
+                  app.openLink({
+                    url: "https://plus.excalidraw.com?utm_source=mcp&utm_medium=app&utm_content=main_menu"
+                  })
+                }}
+                style={{minWidth: 200}}
+              >
                 {excalidrawLogo} Excalidraw
-              </MainMenu.ItemLink >
-              <MainMenu.DefaultItems.Socials/>
+              </MainMenu.Item>
             </MainMenu >
           </Excalidraw>
         </div>
