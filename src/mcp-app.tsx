@@ -225,6 +225,8 @@ function assignGroupIdsForNestedShapes(elements: any[]): any[] {
 }
 
 const LABELABLE_SHAPES = new Set(["rectangle", "diamond", "ellipse"]);
+const DARK_TEXT_COLOR = "#4b5c6b";
+const LIGHT_TEXT_COLOR = "#ffffff";
 /** Max pixels the text can be above the shape's top edge. */
 const MAX_GROUP_TITLE_GAP_ABOVE = 80;
 /** Max pixels the text bottom can extend below the shape's top (overlap or inside top of shape). */
@@ -286,6 +288,31 @@ function mergeGroupTitleTextIntoShapes(elements: any[]): any[] {
 /** Min area for a shape to be treated as a group container (label at top). Smaller = inner box (label centered). */
 const GROUP_LABEL_AREA_THRESHOLD = 25000;
 
+function parseHexColor(color: unknown): { r: number; g: number; b: number } | null {
+  if (typeof color !== "string") return null;
+  const hex = color.trim().toLowerCase();
+  if (!hex || hex === "transparent") return null;
+  const m3 = /^#([0-9a-f]{3})$/.exec(hex);
+  if (m3) {
+    const [r, g, b] = m3[1].split("").map((ch) => parseInt(ch + ch, 16));
+    return { r, g, b };
+  }
+  const m6 = /^#([0-9a-f]{6})$/.exec(hex);
+  if (!m6) return null;
+  return {
+    r: parseInt(m6[1].slice(0, 2), 16),
+    g: parseInt(m6[1].slice(2, 4), 16),
+    b: parseInt(m6[1].slice(4, 6), 16),
+  };
+}
+
+function textColorForBackground(backgroundColor: unknown): string | null {
+  const rgb = parseHexColor(backgroundColor);
+  if (!rgb) return null;
+  const luma = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255;
+  return luma < 0.58 ? LIGHT_TEXT_COLOR : DARK_TEXT_COLOR;
+}
+
 /** Convert raw shorthand elements → Excalidraw format (labels → bound text, font fix).
  *  Preserves pseudo-elements like cameraUpdate (not valid Excalidraw types).
  *  Uses Helvetica (never hand-drawn) and roughness 0 (cleaner). */
@@ -299,11 +326,21 @@ function convertRawElements(els: any[]): any[] {
     const verticalAlign = LABELABLE_SHAPES.has(el.type) && area >= GROUP_LABEL_AREA_THRESHOLD ? "top" : "middle";
     return { ...el, label: { textAlign: "center", ...el.label, verticalAlign } };
   });
-  const converted = convertToExcalidrawElements(withDefaults, { regenerateIds: false })
-    .map((el: any) => {
-      const base = el.type === "text" ? { ...el, fontFamily: (FONT_FAMILY as any).Helvetica } : el;
-      return { ...base, roughness: 0 };
-    });
+  const convertedRaw = convertToExcalidrawElements(withDefaults, { regenerateIds: false });
+  const byId = new Map(convertedRaw.map((el: any) => [el.id, el]));
+  const converted = convertedRaw.map((el: any) => {
+    if (el.type === "text") {
+      const parent = el.containerId ? byId.get(el.containerId) : null;
+      const contrast = textColorForBackground(parent?.backgroundColor);
+      return {
+        ...el,
+        fontFamily: (FONT_FAMILY as any).Helvetica,
+        strokeColor: contrast ?? el.strokeColor,
+        roughness: 0,
+      };
+    }
+    return { ...el, roughness: 0 };
+  });
   return [...converted, ...pseudos];
 }
 
