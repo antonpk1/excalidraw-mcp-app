@@ -2,8 +2,10 @@
   "buildCommand": "pnpm run build",
   "outputDirectory": ".",
   "cleanUrls": false,
+  "redirects": [
+    { "source": "/", "destination": "/mcp", "statusCode": 308 }
+  ],
   "rewrites": [
-    { "source": "/", "destination": "/api/mcp" },
     { "source": "/mcp", "destination": "/api/mcp" },
     { "source": "/sse", "destination": "/api/mcp" },
     { "source": "/message", "destination": "/api/mcp" }
