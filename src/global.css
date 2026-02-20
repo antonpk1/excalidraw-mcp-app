@@ -97,6 +97,8 @@ body {
 
 /* Toolbar - appears on hover */
 .toolbar {
+  display: flex;
+  gap: 1rem;
   position: absolute;
   top: 8px;
   right: 8px;
@@ -110,14 +112,13 @@ body {
 }
 
 /* Fullscreen button */
-.fullscreen-btn {
+.app-button {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
+  gap: 0.5rem;
   height: 28px;
-  padding: 0;
-  color: rgba(0, 0, 0, 0.45);
+  padding: 2px 8px;
   background: rgba(255, 255, 255, 0.6);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -129,15 +130,10 @@ body {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
-.fullscreen-btn:hover {
+.app-button:hover {
   color: rgba(0, 0, 0, 0.7);
   background: rgba(255, 255, 255, 0.8);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
-}
-
-/* Hide fullscreen button in fullscreen mode (host provides exit UI) */
-.main.fullscreen .fullscreen-btn {
-  display: none !important;
 }
 
 .excalidraw-container {
